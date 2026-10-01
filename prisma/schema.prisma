@@ -17,6 +17,7 @@ model User {
   createdAt   DateTime     @default(now())
   enrollments Enrollment[]
   sessions    Session[]
+  files       StoredFile[]
 }
 
 model Subject {
@@ -26,6 +27,8 @@ model Subject {
   group        String       @default("")
   createdAt    DateTime     @default(now())
   enrollments  Enrollment[]
+  lessons      Lesson[]
+  files        StoredFile[]
 }
 
 enum Role {
@@ -67,4 +70,82 @@ model Session {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+}
+
+// Una sesión del timeline. Los alumnos solo la ven cuando publishAt ya ha pasado;
+// publishAt nulo significa borrador.
+model Lesson {
+  id          String       @id @default(cuid())
+  subjectId   String
+  date        DateTime
+  title       String
+  plan        String       @default("")
+  publishAt   DateTime?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  subject     Subject      @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  materials   Material[]
+  assessments Assessment[]
+
+  @@index([subjectId, date])
+}
+
+enum MaterialKind {
+  TEXT
+  LINK
+  FILE
+}
+
+// publishAt nulo: se publica junto con la sesión.
+model Material {
+  id        String       @id @default(cuid())
+  lessonId  String
+  title     String
+  kind      MaterialKind
+  body      String       @default("")
+  url       String?
+  fileId    String?      @unique
+  publishAt DateTime?
+  position  Int          @default(0)
+  createdAt DateTime     @default(now())
+  lesson    Lesson       @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  file      StoredFile?  @relation(fields: [fileId], references: [id], onDelete: SetNull)
+
+  @@index([lessonId])
+}
+
+model Assessment {
+  id                 String      @id @default(cuid())
+  lessonId           String
+  title              String
+  instructions       String      @default("")
+  dueAt              DateTime?
+  weight             Float       @default(0)
+  rubric             String      @default("")
+  acceptsSubmissions Boolean     @default(false)
+  fileId             String?     @unique
+  publishAt          DateTime?
+  createdAt          DateTime    @default(now())
+  lesson             Lesson      @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  file               StoredFile? @relation(fields: [fileId], references: [id], onDelete: SetNull)
+
+  @@index([lessonId])
+}
+
+// Archivo en el almacenamiento (Supabase Storage o disco local en desarrollo).
+model StoredFile {
+  id              String      @id @default(cuid())
+  subjectId       String
+  storageKey      String      @unique
+  name            String
+  size            Int
+  mimeType        String
+  uploadedById    String
+  uploadTokenHash String?
+  uploadedAt      DateTime?
+  createdAt       DateTime    @default(now())
+  subject         Subject     @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  uploadedBy      User        @relation(fields: [uploadedById], references: [id], onDelete: Cascade)
+  material        Material?
+  assessment      Assessment?
 }
