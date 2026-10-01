@@ -11,6 +11,9 @@ const trazos = {
     </>
   ),
   flecha: <path d="M6 24h34M30 14l10 10-10 10" />,
+  // Añadido para Aula26 (no está en Aula) con las mismas reglas de trazo: pantalla de proyección.
+  diapositivas: <path d="M6 8h36v24H6zM24 32v8M16 40h16" />,
+  check: <path d="M8 25l10 10 22-22" />,
 };
 
 export type NombreIcono = keyof typeof trazos;

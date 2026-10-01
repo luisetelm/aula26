@@ -50,7 +50,7 @@ export default async function LessonEditor({ params }: PageProps<"/asignaturas/[
             {lesson.materials.map((m) => (
               <li key={m.id} className="flex items-center justify-between gap-3 py-2 text-sm">
                 <span>
-                  <span className="text-gris">{KIND[m.kind]} · </span>{m.title}
+                  <span className="text-gris">{m.isSlides ? "Diapositivas" : KIND[m.kind]} · </span>{m.title}
                   {m.file && <span className="text-gris"> ({Math.ceil(m.file.size / 1024)} KB)</span>}
                   {m.publishAt && <span className="ml-2"><PublishBadge publishAt={m.publishAt} /></span>}
                 </span>

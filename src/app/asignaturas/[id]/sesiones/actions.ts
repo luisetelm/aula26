@@ -59,7 +59,7 @@ export type MaterialForm =
 export async function addMaterialAction(
   subjectId: string,
   lessonId: string,
-  input: MaterialForm & { publishAt: string },
+  input: MaterialForm & { publishAt: string; isSlides: boolean },
 ): Promise<{ error?: string }> {
   const user = await requireUser();
   try {

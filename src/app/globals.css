@@ -67,6 +67,9 @@ body {
 .md a { @apply text-acento underline underline-offset-4; }
 .md code { @apply bg-papel px-1 font-mono text-[0.9em]; }
 .md strong { @apply font-semibold; }
+/* Markdown sobre fondos oscuros (tinta, acento): enlaces y viñetas en papel. */
+.sobre-oscuro .md a, .sobre-oscuro .md li::marker { @apply text-papel; }
+.sobre-oscuro .md code { @apply bg-tinta-profunda; }
 
 input[type="file"]::file-selector-button {
   @apply mr-3 cursor-pointer border-2 border-grafito bg-transparent px-3 py-1 font-sans font-medium text-grafito hover:bg-piedra;
