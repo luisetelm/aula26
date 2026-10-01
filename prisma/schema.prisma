@@ -1,0 +1,70 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id          String       @id @default(cuid())
+  email       String       @unique
+  firstName   String       @default("")
+  lastName    String       @default("")
+  isAdmin     Boolean      @default(false)
+  createdAt   DateTime     @default(now())
+  enrollments Enrollment[]
+  sessions    Session[]
+}
+
+model Subject {
+  id           String       @id @default(cuid())
+  name         String
+  academicYear String
+  group        String       @default("")
+  createdAt    DateTime     @default(now())
+  enrollments  Enrollment[]
+}
+
+enum Role {
+  TEACHER
+  STUDENT
+}
+
+model Enrollment {
+  id        String   @id @default(cuid())
+  userId    String
+  subjectId String
+  role      Role     @default(STUDENT)
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subject   Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, subjectId])
+  @@index([subjectId])
+}
+
+// Enlace mágico de un solo uso. Solo guardamos el hash del token.
+model LoginToken {
+  id        String    @id @default(cuid())
+  email     String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([email, createdAt])
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  tokenHash String   @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
