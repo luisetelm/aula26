@@ -70,11 +70,11 @@ export function MaterialFormView({ subjectId, lessonId }: { subjectId: string; l
       {kind === "FILE" && <input name="file" type="file" required className="text-sm" />}
       {kind === "LINK" && <input name="url" type="url" required placeholder="https://…" className="input w-full" />}
       {kind === "TEXT" && <textarea name="body" required rows={4} placeholder="Admite Markdown" className="input w-full font-mono text-sm" />}
-      <label className="flex flex-wrap items-center gap-2 text-sm text-slate-600">
+      <label className="flex flex-wrap items-center gap-2 text-sm text-gris">
         Publicar desde (vacío = con la sesión)
         <input name="publishAt" type="datetime-local" className="input py-1" />
       </label>
-      {error && <p className="text-sm text-red-700">{error}</p>}
+      {error && <p className="text-sm text-aviso">{error}</p>}
       <button disabled={pending} className="btn-primary">{pending ? "Guardando…" : "Añadir material"}</button>
     </form>
   );
@@ -120,14 +120,14 @@ export function AssessmentFormView({ subjectId, lessonId }: { subjectId: string;
         </label>
       </div>
       <textarea name="rubric" rows={3} placeholder="Rúbrica o criterios de corrección (solo la ven los profesores)" className="input w-full text-sm" />
-      <div className="flex flex-wrap items-center gap-3 text-sm text-slate-600">
+      <div className="flex flex-wrap items-center gap-3 text-sm text-gris">
         <label>Archivo adjunto (opcional) <input name="file" type="file" className="ml-2" /></label>
       </div>
-      <label className="flex flex-wrap items-center gap-2 text-sm text-slate-600">
+      <label className="flex flex-wrap items-center gap-2 text-sm text-gris">
         Publicar desde (vacío = con la sesión)
         <input name="publishAt" type="datetime-local" className="input py-1" />
       </label>
-      {error && <p className="text-sm text-red-700">{error}</p>}
+      {error && <p className="text-sm text-aviso">{error}</p>}
       <button disabled={pending} className="btn-primary">{pending ? "Guardando…" : "Añadir prueba"}</button>
     </form>
   );

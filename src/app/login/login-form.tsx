@@ -7,7 +7,7 @@ export function LoginForm() {
   const [state, action, pending] = useActionState<LoginState, FormData>(requestLogin, { status: "idle" });
 
   if (state.status === "sent") {
-    return <p className="rounded-lg bg-emerald-50 p-4 text-emerald-900">{state.message}</p>;
+    return <p className="bg-acento-suave p-4">{state.message}</p>;
   }
 
   return (
@@ -19,11 +19,11 @@ export function LoginForm() {
           type="email"
           required
           autoComplete="email"
-          className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
+          className="input mt-1 w-full"
           placeholder="nombre@escuela.es"
         />
       </label>
-      {state.status === "error" && <p className="text-sm text-red-700">{state.message}</p>}
+      {state.status === "error" && <p className="text-sm text-aviso">{state.message}</p>}
       <button disabled={pending} className="btn-primary w-full">
         {pending ? "Enviando…" : "Enviarme el enlace"}
       </button>

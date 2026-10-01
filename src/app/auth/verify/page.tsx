@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Portada } from "@/components/portada";
 import { consumeLogin } from "./actions";
 
 // El enlace del correo abre esta página y el acceso se confirma con un botón (POST),
@@ -8,11 +9,11 @@ export default async function VerifyPage({ searchParams }: PageProps<"/auth/veri
   const valid = typeof token === "string" && token.length > 0;
 
   return (
-    <main className="mx-auto mt-24 w-full max-w-sm px-4">
-      <h1 className="mb-4 text-2xl font-semibold">Aula26</h1>
+    <Portada>
+      <h2 className="mb-4 text-2xl font-semibold">Ya casi estás</h2>
       {error || !valid ? (
         <>
-          <p className="mb-4 text-slate-700">El enlace no es válido o ha caducado.</p>
+          <p className="mb-4 text-gris">El enlace no es válido o ha caducado.</p>
           <Link href="/login" className="btn-primary inline-block">Pedir otro enlace</Link>
         </>
       ) : (
@@ -21,6 +22,6 @@ export default async function VerifyPage({ searchParams }: PageProps<"/auth/veri
           <button className="btn-primary w-full">Entrar en Aula26</button>
         </form>
       )}
-    </main>
+    </Portada>
   );
 }

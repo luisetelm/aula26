@@ -1,14 +1,15 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
+import { Portada } from "@/components/portada";
 import { LoginForm } from "./login-form";
 
 export default async function LoginPage() {
   if (await getCurrentUser()) redirect("/");
   return (
-    <main className="mx-auto mt-24 w-full max-w-sm px-4">
-      <h1 className="mb-2 text-2xl font-semibold">Aula26</h1>
-      <p className="mb-6 text-slate-600">Te enviaremos un enlace a tu correo para entrar, sin contraseña.</p>
+    <Portada>
+      <h2 className="text-2xl font-semibold">Entra con tu correo</h2>
+      <p className="mt-2 mb-6 text-gris">Te enviamos un enlace para entrar, sin contraseña.</p>
       <LoginForm />
-    </main>
+    </Portada>
   );
 }
