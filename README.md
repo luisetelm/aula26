@@ -24,7 +24,7 @@ Tests: `npm test`.
 
 ## Puesta en marcha (Vercel + Supabase)
 
-1. **Supabase:** crea un proyecto y copia las dos cadenas de conexión (botón Connect > ORMs > Prisma) en `DATABASE_URL` y `DIRECT_URL`, como explica `.env.example`. En Storage crea un bucket privado llamado `aula26` con un límite de 50 MB por archivo, y copia la URL del proyecto, la clave publishable y la secret key en las variables `SUPABASE_*`.
+1. **Supabase:** crea un proyecto y copia las dos cadenas de conexión (botón Connect > ORMs > Prisma) en `DATABASE_URL` y `DIRECT_URL`, añadiendo `schema=aula26` como explica `.env.example`, y crea ese esquema (`CREATE SCHEMA aula26;` en el SQL Editor). En Storage crea un bucket privado llamado `aula26` con un límite de 50 MB por archivo, y copia la URL del proyecto, la clave publishable y la secret key en las variables `SUPABASE_*`.
 2. **Gmail:** en tu cuenta de la escuela activa la verificación en dos pasos y crea una contraseña de aplicación (Cuenta de Google > Seguridad > Contraseñas de aplicación). Ponla en `SMTP_PASSWORD` y tu correo en `SMTP_USER`. Si la opción no aparece, el administrador de Workspace la tiene desactivada.
 3. **Vercel:** importa el repositorio, añade las variables de `.env.example` y despliega. El script `vercel-build` aplica las migraciones automáticamente.
 4. **Dominio propio (opcional):** en Vercel > Project > Settings > Domains añade el dominio y crea el registro DNS que te indique. Actualiza `APP_URL`.
