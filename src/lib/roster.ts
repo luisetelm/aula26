@@ -15,6 +15,13 @@ export function detectColumns(sheet: Sheet): ColumnMap {
   return { email, firstName, lastName, role };
 }
 
+// Para listados sin correo: la columna con el nombre completo del alumnado.
+export function detectNameColumn(sheet: Sheet) {
+  const h = sheet.headers.map(norm);
+  const i = h.findIndex((x) => /alumn|estudiante|nombre|name/.test(x));
+  return i >= 0 ? i : 0;
+}
+
 export function toEntries(sheet: Sheet, map: ColumnMap) {
   const valid: RosterEntry[] = [];
   const invalid: { row: number; value: string }[] = [];

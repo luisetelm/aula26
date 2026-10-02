@@ -8,6 +8,7 @@ import { redirect } from "next/navigation";
 import { hashToken, newCode, newToken, normalizeEmail } from "@/lib/tokens";
 import { createSession, isBootstrapAdmin } from "@/lib/auth";
 import { safeNext } from "@/lib/next-path";
+import { emailAllowed, subjectByJoinCode } from "@/lib/seats";
 
 const TOKEN_MINUTES = 15;
 const MAX_PER_HOUR = 5;
@@ -23,6 +24,15 @@ export async function requestLogin(_prev: LoginState, formData: FormData): Promi
   let user = await db.user.findUnique({ where: { email } });
   if (!user && isBootstrapAdmin(email)) {
     user = await db.user.create({ data: { email, isAdmin: true } });
+  }
+  // Con un enlace de inscripción válido, se crea la cuenta (si el correo es del dominio pedido).
+  const join = String(formData.get("join") ?? "");
+  if (!user && join) {
+    const subject = await subjectByJoinCode(join);
+    if (subject && !emailAllowed(subject, email)) {
+      return { status: "error", message: `Usa tu correo de @${subject.emailDomain}.` };
+    }
+    if (subject) user = await db.user.create({ data: { email } });
   }
 
   // Respondemos igual exista o no el correo, para no revelar quién está dado de alta.

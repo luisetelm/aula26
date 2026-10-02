@@ -21,6 +21,7 @@ model User {
   submissions Submission[]
   oauthCodes  OAuthCode[]
   oauthTokens OAuthToken[]
+  seats       Seat[]
 }
 
 model Subject {
@@ -28,6 +29,9 @@ model Subject {
   name         String
   academicYear String
   group        String       @default("")
+  joinCode     String?      @unique // enlace de inscripción: /unirse/<código>
+  emailDomain  String       @default("") // si no está vacío, solo correos de este dominio pueden inscribirse
+  seats        Seat[]
   createdAt    DateTime     @default(now())
   enrollments  Enrollment[]
   lessons      Lesson[]
@@ -238,4 +242,19 @@ model OAuthToken {
   user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+}
+
+// Plaza del listado de la escuela (solo el nombre). Cada estudiante la reclama al entrar con el enlace de inscripción.
+model Seat {
+  id        String    @id @default(cuid())
+  subjectId String
+  name      String
+  userId    String?
+  claimedAt DateTime?
+  createdAt DateTime  @default(now())
+  subject   Subject   @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  user      User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@unique([subjectId, userId])
+  @@index([subjectId])
 }

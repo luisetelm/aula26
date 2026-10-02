@@ -3,7 +3,7 @@
 import { useActionState } from "react";
 import { loginWithCode, requestLogin, type CodeState, type LoginState } from "./actions";
 
-export function LoginForm({ next }: { next: string }) {
+export function LoginForm({ next, join = "" }: { next: string; join?: string }) {
   const [state, action, pending] = useActionState<LoginState, FormData>(requestLogin, { status: "idle" });
 
   if (state.status === "sent") return <CodeForm email={state.email ?? ""} message={state.message ?? ""} next={next} />;
@@ -11,6 +11,7 @@ export function LoginForm({ next }: { next: string }) {
   return (
     <form action={action} className="space-y-4">
       <input type="hidden" name="next" value={next} />
+      <input type="hidden" name="join" value={join} />
       <label className="block">
         <span className="text-sm font-medium">Correo de la escuela</span>
         <input

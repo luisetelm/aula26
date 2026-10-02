@@ -6,6 +6,7 @@ import { db } from "@/lib/db";
 import { canManageSubject, requireUser } from "@/lib/auth";
 import { parseRosterFile } from "@/lib/roster-file";
 import type { Sheet } from "@/lib/roster";
+import * as seats from "@/lib/seats";
 
 const MAX_FILE_BYTES = 5 * 1024 * 1024;
 
@@ -27,7 +28,7 @@ export async function previewRoster(subjectId: string, formData: FormData): Prom
   }
   try {
     const sheet = await parseRosterFile(file.name, await file.arrayBuffer());
-    if (sheet.rows.length === 0) return { ok: false, error: "No he encontrado ningún correo en el archivo." };
+    if (sheet.rows.length === 0) return { ok: false, error: "No he encontrado ninguna fila con datos en el archivo." };
     return { ok: true, sheet };
   } catch {
     return { ok: false, error: "No he podido leer el archivo. Comprueba que es un Excel válido." };
@@ -95,5 +96,44 @@ export async function removePerson(subjectId: string, enrollmentId: string) {
   const e = await db.enrollment.findFirst({ where: { id: enrollmentId, subjectId } });
   if (!e || (e.userId === user.id && !user.isAdmin)) return;
   await db.enrollment.delete({ where: { id: e.id } });
+  revalidatePath(`/asignaturas/${subjectId}/personas`);
+}
+
+// ---------- Plazas (listados sin correo) e inscripción con enlace ----------
+
+export async function importSeats(subjectId: string, names: string[]) {
+  const user = await requireManager(subjectId);
+  const result = await seats.addSeats(user, subjectId, z.array(z.string().max(300)).max(2000).parse(names));
+  revalidatePath(`/asignaturas/${subjectId}/personas`);
+  return result;
+}
+
+export async function newJoinLink(subjectId: string) {
+  const user = await requireManager(subjectId);
+  await seats.newJoinCode(user, subjectId);
+  revalidatePath(`/asignaturas/${subjectId}/personas`);
+}
+
+export async function disableJoinLink(subjectId: string) {
+  const user = await requireManager(subjectId);
+  await seats.disableJoin(user, subjectId);
+  revalidatePath(`/asignaturas/${subjectId}/personas`);
+}
+
+export async function saveEmailDomain(subjectId: string, formData: FormData) {
+  const user = await requireManager(subjectId);
+  await seats.setEmailDomain(user, subjectId, String(formData.get("domain") ?? "")).catch(() => {});
+  revalidatePath(`/asignaturas/${subjectId}/personas`);
+}
+
+export async function releaseSeat(subjectId: string, seatId: string) {
+  const user = await requireManager(subjectId);
+  await seats.releaseSeat(user, subjectId, seatId);
+  revalidatePath(`/asignaturas/${subjectId}/personas`);
+}
+
+export async function removeSeat(subjectId: string, seatId: string) {
+  const user = await requireManager(subjectId);
+  await seats.removeSeat(user, subjectId, seatId);
   revalidatePath(`/asignaturas/${subjectId}/personas`);
 }

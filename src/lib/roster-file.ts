@@ -59,11 +59,12 @@ export async function parseRosterFile(name: string, data: ArrayBuffer): Promise<
   if (matrix.length === 0) throw new Error("El archivo está vacío.");
 
   // La cabecera es la última fila sin correos antes del primer correo (puede haber títulos encima).
+  // Si el archivo no trae ningún correo (listados de la escuela con solo nombres), la cabecera es la primera fila.
   const hasEmail = (r: string[]) => r.some((c) => c.includes("@"));
   const firstEmail = matrix.findIndex(hasEmail);
-  const headerIdx = firstEmail > 0 ? firstEmail - 1 : -1;
+  const headerIdx = firstEmail > 0 ? firstEmail - 1 : firstEmail < 0 && matrix.length > 1 ? 0 : -1;
   const headers = headerIdx >= 0 ? matrix[headerIdx] : [];
-  const body = matrix.slice(headerIdx + 1).filter(hasEmail);
+  const body = matrix.slice(headerIdx + 1).filter((r) => firstEmail < 0 || hasEmail(r));
   const width = Math.max(headers.length, ...body.map((r) => r.length));
   const pad = (r: string[]) => Array.from({ length: width }, (_, i) => r[i] ?? "");
   return {

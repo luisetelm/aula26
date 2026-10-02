@@ -1,8 +1,8 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { detectColumns, toEntries, type ColumnMap, type Sheet } from "@/lib/roster";
-import { importRoster, previewRoster, type ImportResult } from "./actions";
+import { detectColumns, detectNameColumn, toEntries, type ColumnMap, type Sheet } from "@/lib/roster";
+import { importRoster, importSeats, previewRoster, type ImportResult } from "./actions";
 
 type RoleMode = "STUDENT" | "TEACHER" | "COLUMN";
 
@@ -19,7 +19,15 @@ export function RosterImport({ subjectId }: { subjectId: string }) {
   const [roleMode, setRoleMode] = useState<RoleMode>("STUDENT");
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ImportResult | null>(null);
+  const [seatResult, setSeatResult] = useState<{ added: number; skipped: number } | null>(null);
+  const [nameCol, setNameCol] = useState(0);
   const [pending, startTransition] = useTransition();
+
+  // Listado sin correos: cada fila es una plaza con el nombre completo.
+  const names = useMemo(() => {
+    if (!sheet || !map || map.email >= 0) return null;
+    return sheet.rows.map((r) => (r[nameCol] ?? "").replace(/\s+/g, " ").trim()).filter(Boolean);
+  }, [sheet, map, nameCol]);
 
   const preview = useMemo(() => {
     if (!sheet || !map || map.email < 0) return null;
@@ -31,13 +39,24 @@ export function RosterImport({ subjectId }: { subjectId: string }) {
   function onFile(formData: FormData) {
     setError(null);
     setResult(null);
+    setSeatResult(null);
     startTransition(async () => {
       const res = await previewRoster(subjectId, formData);
       if (!res.ok) return setError(res.error);
       const detected = detectColumns(res.sheet);
       setSheet(res.sheet);
       setMap(detected);
+      setNameCol(detectNameColumn(res.sheet));
       setRoleMode(detected.role >= 0 ? "COLUMN" : "STUDENT");
+    });
+  }
+
+  function onImportSeats() {
+    if (!names) return;
+    startTransition(async () => {
+      setSeatResult(await importSeats(subjectId, names));
+      setSheet(null);
+      setMap(null);
     });
   }
 
@@ -54,13 +73,21 @@ export function RosterImport({ subjectId }: { subjectId: string }) {
     <section className="card">
       <h2 className="mb-1 text-lg font-semibold">Importar desde Excel</h2>
       <p className="mb-4 text-sm text-gris">
-        Sube el .xlsx o .csv de la escuela. Solo hace falta una columna con el correo; nombre y apellidos son opcionales.
+        Sube el .xlsx o .csv de la escuela. Si trae correos, se da de alta a cada persona. Si solo trae nombres, se crean
+        plazas y cada estudiante se inscribe con el enlace de inscripción.
       </p>
 
       {result && (
         <p className="mb-4 bg-acento-suave p-3 text-sm">
           Hecho: {result.enrolled} personas añadidas a la asignatura ({result.created} nuevas en Aula26)
           {result.alreadyEnrolled > 0 && `, ${result.alreadyEnrolled} ya estaban`}.
+        </p>
+      )}
+
+      {seatResult && (
+        <p className="mb-4 bg-acento-suave p-3 text-sm">
+          Hecho: {seatResult.added} nombres añadidos al listado{seatResult.skipped > 0 && ` (${seatResult.skipped} ya estaban)`}. Comparte
+          el enlace de inscripción de abajo con la clase.
         </p>
       )}
 
@@ -72,7 +99,33 @@ export function RosterImport({ subjectId }: { subjectId: string }) {
       )}
       {error && <p className="mt-3 text-sm text-aviso">{error}</p>}
 
-      {sheet && map && (
+      {sheet && map && names && (
+        <div className="space-y-4">
+          <p className="bg-acento-suave p-3 text-sm">
+            Este archivo no trae correos. Importaré los nombres como plazas: cada estudiante abrirá el enlace de inscripción,
+            entrará con su correo y elegirá su nombre.
+          </p>
+          <label className="flex flex-col text-sm">
+            Columna con el nombre completo
+            <select className="input mt-1 w-fit" value={nameCol} onChange={(ev) => setNameCol(Number(ev.target.value))}>
+              {sheet.headers.map((h, i) => (
+                <option key={i} value={i}>{h}</option>
+              ))}
+            </select>
+          </label>
+          <ul className="max-h-72 columns-1 overflow-auto border border-linea p-3 text-sm sm:columns-2">
+            {names.map((n, i) => <li key={i}>{n}</li>)}
+          </ul>
+          <div className="flex gap-3">
+            <button onClick={onImportSeats} disabled={pending || names.length === 0} className="btn-primary">
+              {pending ? "Importando…" : `Importar ${names.length} nombres`}
+            </button>
+            <button onClick={() => { setSheet(null); setMap(null); }} className="btn-secondary">Cancelar</button>
+          </div>
+        </div>
+      )}
+
+      {sheet && map && !names && (
         <div className="space-y-4">
           <div className="flex flex-wrap gap-4">
             {FIELDS.map((f) => (
