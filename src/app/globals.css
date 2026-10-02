@@ -67,9 +67,19 @@ body {
 .md a { @apply text-acento underline underline-offset-4; }
 .md code { @apply bg-papel px-1 font-mono text-[0.9em]; }
 .md strong { @apply font-semibold; }
+.md table { @apply w-full border-collapse text-sm; }
+.md th { @apply border-b-2 border-grafito px-3 py-2 text-left align-bottom font-semibold; }
+.md td { @apply border-b border-linea px-3 py-2 align-top; }
+.md th:first-child, .md td:first-child { @apply pl-0; }
+.md blockquote { @apply border-l-4 border-acento pl-4; }
+.md hr { @apply border-linea; }
+.md input[type="checkbox"] { @apply mr-2; }
 /* Markdown sobre fondos oscuros (tinta, acento): enlaces y viñetas en papel. */
 .sobre-oscuro .md a, .sobre-oscuro .md li::marker { @apply text-papel; }
 .sobre-oscuro .md code { @apply bg-tinta-profunda; }
+.sobre-oscuro .md th { @apply border-papel; }
+.sobre-oscuro .md td { @apply border-papel/30; }
+.sobre-oscuro .md blockquote { @apply border-papel; }
 
 input[type="file"]::file-selector-button {
   @apply mr-3 cursor-pointer border-2 border-grafito bg-transparent px-3 py-1 font-sans font-medium text-grafito hover:bg-piedra;
