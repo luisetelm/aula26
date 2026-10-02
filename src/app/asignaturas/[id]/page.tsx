@@ -3,6 +3,7 @@ import { getSubjectAccess } from "@/lib/subject-access";
 import { getTimeline } from "@/lib/content";
 import { dayParts, daysUntil, formatDate, formatDateTime, relativeDay } from "@/lib/time";
 import { Markdown } from "@/components/markdown";
+import { Plegable } from "@/components/plegable";
 import { PublishBadge } from "@/components/publish-badge";
 import { Estrella, Icono } from "@/components/icono";
 import { Programa, minutosTotales } from "@/components/programa";
@@ -11,6 +12,7 @@ import { db } from "@/lib/db";
 import { EntregaAlumno } from "./tareas/entrega-alumno";
 import { createLessonAction } from "./sesiones/actions";
 import { LessonFields } from "./sesiones/lesson-fields";
+import { PlegarSesiones } from "./plegar-sesiones";
 
 type Lesson = Awaited<ReturnType<typeof getTimeline>>[number];
 type Material = Lesson["materials"][number];
@@ -88,11 +90,23 @@ export default async function SubjectTimeline({ params }: PageProps<"/asignatura
         </div>
       )}
 
-      <ol className="space-y-6">
+      <div className="space-y-3">
+      <PlegarSesiones botones={lessons.length > 1} />
+      <ol id="sesiones" className="space-y-6">
         {lessons.map((l) => (
-          <Sesion key={l.id} lesson={l} subjectId={id} canManage={canManage} now={now} entregas={entregas} />
+          <Sesion
+            key={l.id}
+            lesson={l}
+            subjectId={id}
+            canManage={canManage}
+            now={now}
+            entregas={entregas}
+            // Las sesiones pasadas salen plegadas, salvo la destacada arriba o si tienen una tarea con plazo abierto.
+            abierta={daysUntil(l.date, now) >= 0 || l.id === foco?.id || l.assessments.some((a) => !!a.dueAt && a.dueAt >= now)}
+          />
         ))}
       </ol>
+      </div>
 
       {canManage && (
         <section className="card">
@@ -162,12 +176,14 @@ function Sesion({
   canManage,
   now,
   entregas,
+  abierta,
 }: {
   lesson: Lesson;
   subjectId: string;
   canManage: boolean;
   now: Date;
   entregas: Entregas;
+  abierta: boolean;
 }) {
   const d = daysUntil(l.date, now);
   const hoy = d === 0;
@@ -185,8 +201,10 @@ function Sesion({
         <div className="text-xs text-gris">{weekday}</div>
       </div>
 
-      <article className={`card space-y-5 max-sm:p-4 ${hoy ? "ring-2 ring-acento" : ""} ${pasada ? "bg-papel-hondo/60" : ""}`}>
-        <header className="flex flex-wrap items-start justify-between gap-3">
+      <details open={abierta} data-recordar={`s-${l.id}`} data-abierto={abierta ? "1" : "0"} className={`group card max-sm:p-4 ${hoy ? "ring-2 ring-acento" : ""} ${pasada ? "bg-papel-hondo/60" : ""}`}>
+        <summary className="flex cursor-pointer list-none flex-wrap items-start justify-between gap-3 [&::-webkit-details-marker]:hidden">
+          <div className="flex min-w-0 gap-3">
+          <Icono nombre="desplegar" className="mt-1 h-5 w-5 flex-none text-gris transition-transform group-not-open:-rotate-90" />
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               {hoy && <span className="badge border-acento bg-acento text-papel">Hoy</span>}
@@ -200,30 +218,31 @@ function Sesion({
               {l.assessments.length > 0 && <span className="inline-flex items-center gap-1"><Icono nombre="entrega" className="h-4 w-4" />{l.assessments.length} {l.assessments.length === 1 ? "tarea" : "tareas"}</span>}
             </p>
           </div>
+          </div>
           <div className="flex flex-wrap items-center gap-3">
             {slides.map((m) => <Diapositivas key={m.id} m={m} />)}
             {canManage && <Link href={`/asignaturas/${subjectId}/sesiones/${l.id}`} className="enlace text-sm">Editar</Link>}
           </div>
-        </header>
+        </summary>
 
+        <div className="mt-5 space-y-5">
         {l.plan.trim() && (
-          <section>
-            <h3 className="etiqueta mb-3">Programa de la sesión</h3>
-            <Programa plan={l.plan} />
-          </section>
+          <Plegable recordar={`p-${l.id}`} titulo="Programa de la sesión" tituloClassName="etiqueta">
+            <div className="mt-3"><Programa plan={l.plan} /></div>
+          </Plegable>
         )}
 
         {material.length > 0 && (
-          <section>
-            <h3 className="etiqueta mb-3">Material</h3>
-            <ul className="grid gap-2 sm:grid-cols-2">
+          <Plegable recordar={`m-${l.id}`} titulo="Material" tituloClassName="etiqueta">
+            <ul className="mt-3 grid gap-2 sm:grid-cols-2">
               {material.map((m) => <MaterialItem key={m.id} m={m} canManage={canManage} />)}
             </ul>
-          </section>
+          </Plegable>
         )}
 
         {l.assessments.map((a) => <Tarea key={a.id} a={a} canManage={canManage} now={now} entregas={entregas} />)}
-      </article>
+        </div>
+      </details>
     </li>
   );
 }
@@ -237,8 +256,17 @@ function MaterialItem({ m, canManage }: { m: Material; canManage: boolean }) {
       <span className="min-w-0 font-medium">{m.title}</span>
     </span>
   );
+  if (m.kind === "TEXT") {
+    return (
+      <li className="bg-papel p-3 sm:col-span-2">
+        <Plegable recordar={`t-${m.id}`} titulo={<span className="flex flex-1 flex-wrap items-center justify-between gap-2">{cabecera}{canManage && m.publishAt && <PublishBadge publishAt={m.publishAt} />}</span>} tituloClassName="text-gris">
+          <div className="mt-2 pl-18"><Markdown>{m.body}</Markdown></div>
+        </Plegable>
+      </li>
+    );
+  }
   return (
-    <li className={`bg-papel p-3 ${m.kind === "TEXT" ? "sm:col-span-2" : ""}`}>
+    <li className="bg-papel p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         {href ? (
           <a href={href} {...(m.kind === "LINK" ? { target: "_blank", rel: "noopener noreferrer" } : {})} className="text-acento hover:underline">
@@ -249,7 +277,6 @@ function MaterialItem({ m, canManage }: { m: Material; canManage: boolean }) {
         )}
         {canManage && m.publishAt && <PublishBadge publishAt={m.publishAt} />}
       </div>
-      {m.kind === "TEXT" && <div className="mt-2 pl-12"><Markdown>{m.body}</Markdown></div>}
     </li>
   );
 }
@@ -259,6 +286,7 @@ function Tarea({ a, canManage, now, entregas }: { a: Assessment; canManage: bool
   const mine = entregas.mine?.get(a.id);
   return (
     <section id={`tarea-${a.id}`} className="sobre-oscuro scroll-mt-6 bg-acento p-5 text-papel">
+      <Plegable recordar={`a-${a.id}`} tituloClassName="items-start! [&>svg]:mt-1" titulo={<div className="min-w-0">
       <div className="flex flex-wrap items-center gap-2">
         <span className="etiqueta inline-flex items-center gap-1 text-papel!"><Icono nombre="entrega" className="h-4 w-4" />Tarea</span>
         {a.dueAt && <Plazo dueAt={a.dueAt} now={now} oscuro />}
@@ -267,6 +295,7 @@ function Tarea({ a, canManage, now, entregas }: { a: Assessment; canManage: bool
         {canManage && a.publishAt && <PublishBadge publishAt={a.publishAt} oscuro />}
       </div>
       <h3 className="mt-2 text-xl font-semibold">{a.title}</h3>
+      </div>}>
       {a.dueAt && <p className="text-sm text-papel">Hasta el {formatDateTime(a.dueAt)}</p>}
       <div className="mt-3"><Markdown>{a.instructions}</Markdown></div>
       {a.file && (
@@ -301,6 +330,7 @@ function Tarea({ a, canManage, now, entregas }: { a: Assessment; canManage: bool
           feedback={mine?.feedback ?? ""}
         />
       )}
+      </Plegable>
     </section>
   );
 }

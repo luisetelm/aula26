@@ -14,6 +14,8 @@ const trazos = {
   // Añadido para Aula26 (no está en Aula) con las mismas reglas de trazo: pantalla de proyección.
   diapositivas: <path d="M6 8h36v24H6zM24 32v8M16 40h16" />,
   check: <path d="M8 25l10 10 22-22" />,
+  // Añadido para Aula26: desplegar / plegar.
+  desplegar: <path d="M12 18l12 12 12-12" />,
 };
 
 export type NombreIcono = keyof typeof trazos;
