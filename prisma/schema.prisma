@@ -18,6 +18,7 @@ model User {
   enrollments Enrollment[]
   sessions    Session[]
   files       StoredFile[]
+  submissions Submission[]
 }
 
 model Subject {
@@ -118,19 +119,21 @@ model Material {
 }
 
 model Assessment {
-  id                 String      @id @default(cuid())
+  id                 String       @id @default(cuid())
   lessonId           String
   title              String
-  instructions       String      @default("")
+  instructions       String       @default("")
   dueAt              DateTime?
-  weight             Float       @default(0)
-  rubric             String      @default("")
-  acceptsSubmissions Boolean     @default(false)
-  fileId             String?     @unique
+  weight             Float        @default(0)
+  rubric             String       @default("")
+  acceptsSubmissions Boolean      @default(false)
+  fileId             String?      @unique
   publishAt          DateTime?
-  createdAt          DateTime    @default(now())
-  lesson             Lesson      @relation(fields: [lessonId], references: [id], onDelete: Cascade)
-  file               StoredFile? @relation(fields: [fileId], references: [id], onDelete: SetNull)
+  gradesPublished    Boolean      @default(false) // el alumnado ve su nota y comentario
+  createdAt          DateTime     @default(now())
+  lesson             Lesson       @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  file               StoredFile?  @relation(fields: [fileId], references: [id], onDelete: SetNull)
+  submissions        Submission[]
 
   @@index([lessonId])
 }
@@ -151,4 +154,27 @@ model StoredFile {
   uploadedBy      User        @relation(fields: [uploadedById], references: [id], onDelete: Cascade)
   material        Material?
   assessment      Assessment?
+  submissionId    String?
+  submission      Submission? @relation(fields: [submissionId], references: [id], onDelete: SetNull)
+
+  @@index([submissionId])
+}
+
+// Entrega de un alumno en una prueba. submittedAt nulo: solo tiene nota (no entregó).
+model Submission {
+  id           String       @id @default(cuid())
+  assessmentId String
+  studentId    String
+  note         String       @default("")
+  submittedAt  DateTime?
+  grade        Float?
+  feedback     String       @default("")
+  gradedAt     DateTime?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  assessment   Assessment   @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  student      User         @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  files        StoredFile[]
+
+  @@unique([assessmentId, studentId])
 }

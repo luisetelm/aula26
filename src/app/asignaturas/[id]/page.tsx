@@ -6,12 +6,21 @@ import { Markdown } from "@/components/markdown";
 import { PublishBadge } from "@/components/publish-badge";
 import { Estrella, Icono } from "@/components/icono";
 import { Programa, minutosTotales } from "@/components/programa";
+import { countSubmissions, getMySubmissions, submissionStatus } from "@/lib/submissions";
+import { db } from "@/lib/db";
+import { EntregaAlumno } from "./tareas/entrega-alumno";
 import { createLessonAction } from "./sesiones/actions";
 import { LessonFields } from "./sesiones/lesson-fields";
 
 type Lesson = Awaited<ReturnType<typeof getTimeline>>[number];
 type Material = Lesson["materials"][number];
 type Assessment = Lesson["assessments"][number];
+type Entregas = {
+  subjectId: string;
+  mine: Awaited<ReturnType<typeof getMySubmissions>> | null;
+  counts: Map<string, number> | null;
+  students: number;
+};
 
 const materialHref = (m: Material) => (m.kind === "FILE" && m.file ? `/api/archivos/${m.file.id}` : m.kind === "LINK" ? m.url : null);
 
@@ -19,7 +28,7 @@ const materialHref = (m: Material) => (m.kind === "FILE" && m.file ? `/api/archi
 function Plazo({ dueAt, now, oscuro = false }: { dueAt: Date; now: Date; oscuro?: boolean }) {
   const d = daysUntil(dueAt, now);
   const cerrada = dueAt < now;
-  const texto = cerrada ? "Plazo cerrado" : d === 0 ? "Se entrega hoy" : `Se entrega ${relativeDay(dueAt, now)}`;
+  const texto = cerrada ? "Plazo cerrado" : d === 0 ? "Se entrega hoy" : d > 14 ? `Se entrega el ${formatDateTime(dueAt).split(",")[0]}` : `Se entrega ${relativeDay(dueAt, now)}`;
   const tono = cerrada
     ? oscuro ? "text-niebla" : "text-gris"
     : d <= 3 ? "border-ocre bg-ocre text-grafito" : oscuro ? "text-papel" : "text-grafito";
@@ -46,9 +55,16 @@ function Diapositivas({ m, grande = false }: { m: Material; grande?: boolean }) 
 
 export default async function SubjectTimeline({ params }: PageProps<"/asignaturas/[id]">) {
   const { id } = await params;
-  const { canManage } = await getSubjectAccess(id);
+  const { user, canManage } = await getSubjectAccess(id);
   const lessons = await getTimeline(id, canManage);
   const now = new Date();
+  const ids = lessons.flatMap((l) => l.assessments.filter((a) => a.acceptsSubmissions).map((a) => a.id));
+  const entregas: Entregas = {
+    subjectId: id,
+    mine: canManage ? null : await getMySubmissions(user.id, ids),
+    counts: canManage ? await countSubmissions(ids) : null,
+    students: canManage ? await db.enrollment.count({ where: { subjectId: id, role: "STUDENT" } }) : 0,
+  };
 
   // La sesión protagonista: la de hoy; si no hay, la siguiente; si no, la última.
   const foco =
@@ -56,6 +72,8 @@ export default async function SubjectTimeline({ params }: PageProps<"/asignatura
   const pendientes = lessons
     .flatMap((l) => l.assessments.map((a) => ({ ...a, lessonId: l.id })))
     .filter((a): a is Assessment & { lessonId: string; dueAt: Date } => !!a.dueAt && a.dueAt >= now)
+    // Para el alumno, lo ya entregado deja de estar pendiente.
+    .filter((a) => !entregas.mine?.get(a.id)?.submittedAt)
     .sort((a, b) => a.dueAt.getTime() - b.dueAt.getTime());
 
   return (
@@ -70,7 +88,7 @@ export default async function SubjectTimeline({ params }: PageProps<"/asignatura
 
       <ol className="space-y-6">
         {lessons.map((l) => (
-          <Sesion key={l.id} lesson={l} subjectId={id} canManage={canManage} now={now} />
+          <Sesion key={l.id} lesson={l} subjectId={id} canManage={canManage} now={now} entregas={entregas} />
         ))}
       </ol>
 
@@ -136,7 +154,19 @@ function Resumen({
   );
 }
 
-function Sesion({ lesson: l, subjectId, canManage, now }: { lesson: Lesson; subjectId: string; canManage: boolean; now: Date }) {
+function Sesion({
+  lesson: l,
+  subjectId,
+  canManage,
+  now,
+  entregas,
+}: {
+  lesson: Lesson;
+  subjectId: string;
+  canManage: boolean;
+  now: Date;
+  entregas: Entregas;
+}) {
   const d = daysUntil(l.date, now);
   const hoy = d === 0;
   const pasada = d < 0;
@@ -190,7 +220,7 @@ function Sesion({ lesson: l, subjectId, canManage, now }: { lesson: Lesson; subj
           </section>
         )}
 
-        {l.assessments.map((a) => <Tarea key={a.id} a={a} canManage={canManage} now={now} />)}
+        {l.assessments.map((a) => <Tarea key={a.id} a={a} canManage={canManage} now={now} entregas={entregas} />)}
       </article>
     </li>
   );
@@ -223,7 +253,8 @@ function MaterialItem({ m, canManage }: { m: Material; canManage: boolean }) {
 }
 
 // La tarea usa el fondo «acento» de la diapositiva Actividad.
-function Tarea({ a, canManage, now }: { a: Assessment; canManage: boolean; now: Date }) {
+function Tarea({ a, canManage, now, entregas }: { a: Assessment; canManage: boolean; now: Date; entregas: Entregas }) {
+  const mine = entregas.mine?.get(a.id);
   return (
     <section id={`tarea-${a.id}`} className="sobre-oscuro scroll-mt-6 bg-acento p-5 text-papel">
       <div className="flex flex-wrap items-center gap-2">
@@ -240,7 +271,28 @@ function Tarea({ a, canManage, now }: { a: Assessment; canManage: boolean; now: 
           <Icono nombre="lectura" className="h-4 w-4" />{a.file.name}
         </a>
       )}
-      {a.acceptsSubmissions && <p className="mt-3 text-sm text-papel">Podrás subir tu entrega aquí muy pronto.</p>}
+      {a.acceptsSubmissions && canManage && (
+        <Link
+          href={`/asignaturas/${entregas.subjectId}/tareas/${a.id}`}
+          className="mt-4 inline-flex items-center gap-2 bg-ocre px-4 py-2 font-medium text-grafito hover:bg-papel"
+        >
+          Ver entregas · {entregas.counts?.get(a.id) ?? 0} de {entregas.students}
+          <Icono nombre="flecha" className="h-4 w-4" />
+        </Link>
+      )}
+      {a.acceptsSubmissions && !canManage && (
+        <EntregaAlumno
+          subjectId={entregas.subjectId}
+          assessmentId={a.id}
+          status={submissionStatus(a.dueAt, mine?.submittedAt, now)}
+          submittedAt={mine?.submittedAt ? formatDateTime(mine.submittedAt) : null}
+          note={mine?.note ?? ""}
+          files={mine?.files.map((f) => ({ id: f.id, name: f.name, size: f.size })) ?? []}
+          graded={mine?.graded ?? false}
+          grade={mine?.grade ?? null}
+          feedback={mine?.feedback ?? ""}
+        />
+      )}
     </section>
   );
 }
