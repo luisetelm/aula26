@@ -25,7 +25,7 @@ export default async function LessonEditor({ params }: PageProps<"/asignaturas/[
 
   return (
     <div className="space-y-6">
-      <Link href={`/asignaturas/${id}#sesion-${lesson.id}`} className="text-sm text-slate-500 hover:text-slate-800">← Volver al timeline</Link>
+      <Link href={`/asignaturas/${id}#sesion-${lesson.id}`} className="text-sm text-gris hover:text-acento">← Volver al timeline</Link>
 
       <section className="card">
         <div className="mb-4 flex items-center justify-between">
@@ -38,24 +38,24 @@ export default async function LessonEditor({ params }: PageProps<"/asignaturas/[
             <button className="btn-primary">Guardar</button>
           </div>
         </form>
-        <form action={deleteLessonAction.bind(null, id, lesson.id)} className="mt-4 border-t border-slate-100 pt-4">
-          <button className="text-sm text-red-700 hover:underline">Borrar la sesión con todo su material y pruebas</button>
+        <form action={deleteLessonAction.bind(null, id, lesson.id)} className="mt-4 border-t border-linea pt-4">
+          <button className="text-sm text-aviso hover:underline">Borrar la sesión con todo su material y pruebas</button>
         </form>
       </section>
 
       <section className="card space-y-4">
         <h2 className="text-lg font-semibold">Material</h2>
         {lesson.materials.length > 0 && (
-          <ul className="divide-y divide-slate-100">
+          <ul className="divide-y divide-linea">
             {lesson.materials.map((m) => (
               <li key={m.id} className="flex items-center justify-between gap-3 py-2 text-sm">
                 <span>
-                  <span className="text-slate-500">{KIND[m.kind]} · </span>{m.title}
-                  {m.file && <span className="text-slate-500"> ({Math.ceil(m.file.size / 1024)} KB)</span>}
+                  <span className="text-gris">{m.isSlides ? "Diapositivas" : KIND[m.kind]} · </span>{m.title}
+                  {m.file && <span className="text-gris"> ({Math.ceil(m.file.size / 1024)} KB)</span>}
                   {m.publishAt && <span className="ml-2"><PublishBadge publishAt={m.publishAt} /></span>}
                 </span>
                 <form action={deleteMaterialAction.bind(null, id, m.id)}>
-                  <button className="text-red-700 hover:underline">Quitar</button>
+                  <button className="text-aviso hover:underline">Quitar</button>
                 </form>
               </li>
             ))}
@@ -67,12 +67,12 @@ export default async function LessonEditor({ params }: PageProps<"/asignaturas/[
       <section className="card space-y-4">
         <h2 className="text-lg font-semibold">Pruebas</h2>
         {lesson.assessments.length > 0 && (
-          <ul className="divide-y divide-slate-100">
+          <ul className="divide-y divide-linea">
             {lesson.assessments.map((a) => (
               <li key={a.id} className="flex items-center justify-between gap-3 py-2 text-sm">
                 <span>
                   {a.title}
-                  <span className="text-slate-500">
+                  <span className="text-gris">
                     {a.weight > 0 && ` · ${a.weight}%`}
                     {a.dueAt && ` · hasta ${formatDateTime(a.dueAt)}`}
                     {a.acceptsSubmissions && " · con entrega"}
@@ -80,7 +80,7 @@ export default async function LessonEditor({ params }: PageProps<"/asignaturas/[
                   {a.publishAt && <span className="ml-2"><PublishBadge publishAt={a.publishAt} /></span>}
                 </span>
                 <form action={deleteAssessmentAction.bind(null, id, a.id)}>
-                  <button className="text-red-700 hover:underline">Quitar</button>
+                  <button className="text-aviso hover:underline">Quitar</button>
                 </form>
               </li>
             ))}

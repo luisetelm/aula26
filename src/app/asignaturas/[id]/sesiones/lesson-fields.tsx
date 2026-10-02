@@ -17,8 +17,15 @@ export function LessonFields({ lesson }: { lesson?: Lesson }) {
         </label>
       </div>
       <label className="flex flex-col text-sm">
-        Programación prevista (admite Markdown)
-        <textarea name="plan" rows={4} defaultValue={lesson?.plan} className="input mt-1 font-mono text-sm" />
+        Qué haremos en clase
+        <span className="text-gris">Un paso por línea empezando por «-». Añade «(10 min)» al final para la duración. Admite Markdown.</span>
+        <textarea
+          name="plan"
+          rows={5}
+          defaultValue={lesson?.plan}
+          className="input mt-1 font-mono text-sm"
+          placeholder={"- Repaso de la sesión anterior (10 min)\n- **Explicación**: tipos de entrevistas (25 min)\n- Práctica por parejas (20 min)"}
+        />
       </label>
       <fieldset className="flex flex-wrap items-center gap-4 text-sm">
         <legend className="mb-1">Visible para los alumnos</legend>

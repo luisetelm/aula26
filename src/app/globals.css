@@ -1,31 +1,76 @@
 @import "tailwindcss";
 
+/* Colores y tipografía del sistema de diseño Aula (tokens.json). */
+@theme {
+  --color-papel: #f7f4ee;
+  --color-papel-hondo: #ede8de;
+  --color-piedra: #ddd9ce;
+  --color-tinta: #1e3a5c;
+  --color-tinta-profunda: #16283d;
+  --color-grafito: #141e29;
+  --color-gris: #525a67;
+  --color-niebla: #b7c3d1;
+  --color-linea: #c9c3b6;
+  --color-acento: #1f6660;
+  --color-acento-suave: #dcebe8;
+  --color-ocre: #e3b04b;
+  --color-agua: #9fc9c2;
+  /* Aula no tiene color de error: rojo oscuro legible sobre papel (7:1), distinto del rojo ESADA. */
+  --color-aviso: #9b2c2c;
+
+  --font-sans: var(--font-work-sans), "Poppins", system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, monospace;
+
+  --radius-tarjeta: 16px;
+}
+
 body {
-  @apply bg-slate-50 text-slate-900;
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  @apply bg-papel font-sans text-grafito accent-acento;
 }
 
 @layer components {
+  /* Filo recto: los bloques y botones no se redondean; solo tarjetas (16px) y chips. */
   .btn-primary {
-    @apply rounded-lg bg-indigo-600 px-4 py-2 text-center font-medium text-white hover:bg-indigo-700 disabled:opacity-60;
+    @apply bg-acento px-4 py-2 text-center font-medium text-papel hover:bg-tinta disabled:opacity-60;
   }
   .btn-secondary {
-    @apply rounded-lg border border-slate-300 bg-white px-4 py-2 text-center font-medium hover:bg-slate-100 disabled:opacity-60;
+    @apply border-2 border-grafito bg-transparent px-4 py-1.5 text-center font-medium hover:bg-papel-hondo disabled:opacity-60;
   }
   .input {
-    @apply rounded-lg border border-slate-300 bg-white px-3 py-2;
+    @apply border border-linea bg-papel px-3 py-2 placeholder:text-gris focus:border-acento focus:outline-2 focus:outline-acento;
   }
   .card {
-    @apply rounded-xl border border-slate-200 bg-white p-5;
+    @apply rounded-tarjeta bg-papel-hondo p-6;
+  }
+  /* Antetítulo en mayúsculas (estilo «etiqueta»). */
+  .etiqueta {
+    @apply text-xs font-semibold tracking-[0.08em] text-acento uppercase;
+  }
+  /* Chip de estado: trazo de 2px del color del texto. */
+  .badge {
+    @apply inline-flex items-center gap-1 rounded-full border-2 border-current px-2.5 py-0.5 text-xs font-medium;
+  }
+  .enlace {
+    @apply font-medium text-acento underline-offset-4 hover:underline;
+  }
+  /* Marcador ocre bajo una expresión clave (grafito encima, 8.5:1). */
+  .marca {
+    background: linear-gradient(transparent 55%, var(--color-ocre) 55%, var(--color-ocre) 92%, transparent 92%);
   }
 }
 
-.md { @apply space-y-2 text-slate-700; }
-.md h1, .md h2, .md h3 { @apply font-semibold text-slate-900; }
+.md { @apply space-y-2; }
+.md h1, .md h2, .md h3 { @apply font-semibold; }
 .md ul { @apply list-disc pl-5; }
 .md ol { @apply list-decimal pl-5; }
-.md a { @apply text-indigo-700 underline; }
-.md code { @apply rounded bg-slate-100 px-1; }
-@layer components {
-  .badge { @apply inline-block rounded-full px-2 py-0.5 text-xs font-medium; }
+.md li::marker { @apply text-acento; }
+.md a { @apply text-acento underline underline-offset-4; }
+.md code { @apply bg-papel px-1 font-mono text-[0.9em]; }
+.md strong { @apply font-semibold; }
+/* Markdown sobre fondos oscuros (tinta, acento): enlaces y viñetas en papel. */
+.sobre-oscuro .md a, .sobre-oscuro .md li::marker { @apply text-papel; }
+.sobre-oscuro .md code { @apply bg-tinta-profunda; }
+
+input[type="file"]::file-selector-button {
+  @apply mr-3 cursor-pointer border-2 border-grafito bg-transparent px-3 py-1 font-sans font-medium text-grafito hover:bg-piedra;
 }

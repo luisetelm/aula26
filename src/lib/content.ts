@@ -61,7 +61,7 @@ export const materialInput = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("TEXT"), title: z.string().trim().min(1).max(200), body: z.string().min(1).max(20000) }),
   z.object({ kind: z.literal("LINK"), title: z.string().trim().min(1).max(200), url: z.url({ protocol: /^https?$/ }) }),
   z.object({ kind: z.literal("FILE"), title: z.string().trim().min(1).max(200), fileId: z.string().min(1) }),
-]).and(z.object({ publishAt: z.date().nullable().default(null) }));
+]).and(z.object({ publishAt: z.date().nullable().default(null), isSlides: z.boolean().default(false) }));
 
 export async function addMaterial(actor: User, lessonId: string, input: z.input<typeof materialInput>) {
   const subjectId = await lessonSubject(lessonId);

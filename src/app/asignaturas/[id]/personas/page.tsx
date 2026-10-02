@@ -39,10 +39,10 @@ export default async function PeoplePage({ params }: PageProps<"/asignaturas/[id
           Personas · {students} alumnos, {enrollments.length - students} profesores
         </h2>
         {enrollments.length === 0 ? (
-          <p className="text-slate-600">Todavía no hay nadie en esta asignatura.</p>
+          <p className="text-gris">Todavía no hay nadie en esta asignatura.</p>
         ) : (
           <table className="w-full text-sm">
-            <thead className="text-left text-slate-500">
+            <thead className="text-left text-gris">
               <tr>
                 <th className="py-2">Apellidos, nombre</th>
                 <th>Correo</th>
@@ -52,21 +52,21 @@ export default async function PeoplePage({ params }: PageProps<"/asignaturas/[id
             </thead>
             <tbody>
               {enrollments.map((e) => (
-                <tr key={e.id} className="border-t border-slate-100">
+                <tr key={e.id} className="border-t border-linea">
                   <td className="py-2">
                     {[e.user.lastName, e.user.firstName].filter(Boolean).join(", ") || "—"}
                   </td>
                   <td>{e.user.email}</td>
                   <td>
                     <form action={setRole.bind(null, id, e.id, e.role === "TEACHER" ? "STUDENT" : "TEACHER")}>
-                      <button className="text-left hover:text-indigo-700" title="Cambiar rol">
+                      <button className="text-left text-acento" title="Cambiar rol">
                         {e.role === "TEACHER" ? "Profesor" : "Alumno"}
                       </button>
                     </form>
                   </td>
                   <td className="text-right">
                     <form action={removePerson.bind(null, id, e.id)}>
-                      <button className="text-red-700 hover:underline">Quitar</button>
+                      <button className="text-aviso hover:underline">Quitar</button>
                     </form>
                   </td>
                 </tr>

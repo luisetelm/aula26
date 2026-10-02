@@ -107,6 +107,7 @@ model Material {
   fileId    String?      @unique
   publishAt DateTime?
   position  Int          @default(0)
+  isSlides  Boolean      @default(false) // las diapositivas de la sesión
   createdAt DateTime     @default(now())
   lesson    Lesson       @relation(fields: [lessonId], references: [id], onDelete: Cascade)
   file      StoredFile?  @relation(fields: [fileId], references: [id], onDelete: SetNull)

@@ -47,3 +47,28 @@ export function formatDateTime(date: Date, timeZone = TIME_ZONE) {
     minute: "2-digit",
   }).format(date);
 }
+
+// "2026-10-06": el día de calendario en la zona del centro.
+export function dayKey(date: Date, timeZone = TIME_ZONE) {
+  return toLocalInput(date, timeZone).slice(0, 10);
+}
+
+// Días de calendario entre hoy y la fecha (0 = hoy, 1 = mañana, -1 = ayer).
+export function daysUntil(date: Date, now = new Date(), timeZone = TIME_ZONE) {
+  const utc = (k: string) => Date.UTC(+k.slice(0, 4), +k.slice(5, 7) - 1, +k.slice(8, 10));
+  return Math.round((utc(dayKey(date, timeZone)) - utc(dayKey(now, timeZone))) / 86_400_000);
+}
+
+// "hoy", "mañana", "en 3 días", "ayer", "hace 5 días".
+export function relativeDay(date: Date, now = new Date(), timeZone = TIME_ZONE) {
+  const d = daysUntil(date, now, timeZone);
+  if (d === 0) return "hoy";
+  if (d === 1) return "mañana";
+  if (d === -1) return "ayer";
+  return d > 0 ? `en ${d} días` : `hace ${-d} días`;
+}
+
+export function dayParts(date: Date, timeZone = TIME_ZONE) {
+  const f = (o: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat("es-ES", { timeZone, ...o }).format(date);
+  return { day: f({ day: "2-digit" }), month: f({ month: "short" }).replace(".", ""), weekday: f({ weekday: "long" }) };
+}
