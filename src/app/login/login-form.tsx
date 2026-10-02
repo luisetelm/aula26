@@ -1,14 +1,12 @@
 "use client";
 
 import { useActionState } from "react";
-import { requestLogin, type LoginState } from "./actions";
+import { loginWithCode, requestLogin, type CodeState, type LoginState } from "./actions";
 
 export function LoginForm() {
   const [state, action, pending] = useActionState<LoginState, FormData>(requestLogin, { status: "idle" });
 
-  if (state.status === "sent") {
-    return <p className="bg-acento-suave p-4">{state.message}</p>;
-  }
+  if (state.status === "sent") return <CodeForm email={state.email ?? ""} message={state.message ?? ""} />;
 
   return (
     <form action={action} className="space-y-4">
@@ -28,5 +26,32 @@ export function LoginForm() {
         {pending ? "Enviando…" : "Enviarme el enlace"}
       </button>
     </form>
+  );
+}
+
+function CodeForm({ email, message }: { email: string; message: string }) {
+  const [state, action, pending] = useActionState<CodeState, FormData>(loginWithCode, {});
+  return (
+    <div className="space-y-4">
+      <p className="bg-acento-suave p-4">{message}</p>
+      <form action={action} className="space-y-4">
+        <input type="hidden" name="email" value={email} />
+        <label className="block">
+          <span className="text-sm font-medium">Código del correo</span>
+          <input
+            name="code"
+            required
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            pattern="[0-9 ]{6,7}"
+            maxLength={7}
+            className="input mt-1 w-full font-mono text-2xl tracking-[0.3em]"
+            placeholder="000000"
+          />
+        </label>
+        {state.error && <p className="text-sm text-aviso">{state.error}</p>}
+        <button disabled={pending} className="btn-primary w-full">{pending ? "Comprobando…" : "Entrar"}</button>
+      </form>
+    </div>
   );
 }
