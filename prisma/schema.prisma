@@ -54,6 +54,8 @@ model LoginToken {
   id        String    @id @default(cuid())
   email     String
   tokenHash String    @unique
+  codeHash  String? // código de 6 cifras, para entrar desde otro navegador
+  attempts  Int       @default(0)
   expiresAt DateTime
   usedAt    DateTime?
   createdAt DateTime  @default(now())
