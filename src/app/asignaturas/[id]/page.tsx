@@ -226,6 +226,9 @@ function Sesion({
         </summary>
 
         <div className="mt-5 space-y-5">
+        {!canManage && d > 0 && (
+          <p className="text-sm text-gris">El programa, el material y las tareas se mostrarán el día de la sesión.</p>
+        )}
         {l.plan.trim() && (
           <Plegable recordar={`p-${l.id}`} titulo="Programa de la sesión" tituloClassName="etiqueta">
             <div className="mt-3"><Programa plan={l.plan} /></div>

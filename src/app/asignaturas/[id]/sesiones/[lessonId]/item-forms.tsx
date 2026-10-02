@@ -78,7 +78,7 @@ export function MaterialFormView({ subjectId, lessonId }: { subjectId: string; l
         </label>
       )}
       <label className="flex flex-wrap items-center gap-2 text-sm text-gris">
-        Publicar desde (vacío = con la sesión)
+        Publicar desde (vacío = el día de la sesión)
         <input name="publishAt" type="datetime-local" className="input py-1" />
       </label>
       {error && <p className="text-sm text-aviso">{error}</p>}
@@ -152,7 +152,7 @@ export function AssessmentFormView({ subjectId, lessonId }: { subjectId: string;
         <label>Archivo adjunto (opcional) <input name="file" type="file" className="ml-2" /></label>
       </div>
       <label className="flex flex-wrap items-center gap-2 text-sm text-gris">
-        Publicar desde (vacío = con la sesión)
+        Publicar desde (vacío = el día de la sesión)
         <input name="publishAt" type="datetime-local" className="input py-1" />
       </label>
       {error && <p className="text-sm text-aviso">{error}</p>}

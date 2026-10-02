@@ -6,7 +6,7 @@ import { db } from "./db";
 import { canManageSubject } from "./auth";
 import { createUploadTarget } from "./storage";
 import { hashToken } from "./tokens";
-import { Forbidden, deleteFiles, isPublished, uploadInput } from "./content";
+import { Forbidden, deleteFiles, itemVisible, uploadInput } from "./content";
 import { extensionAllowed, showExtensions } from "./extensions";
 
 // Entregas del alumnado y notas. Igual que content.ts: cada función comprueba permisos.
@@ -25,7 +25,7 @@ async function assertCanSubmit(actor: User, assessmentId: string) {
   const enrollment = await db.enrollment.findUnique({
     where: { userId_subjectId: { userId: actor.id, subjectId: a.lesson.subjectId } },
   });
-  const visible = isPublished(a.lesson.publishAt) && isPublished(a.publishAt ?? a.lesson.publishAt);
+  const visible = itemVisible(a, a.lesson);
   if (enrollment?.role !== "STUDENT" || !visible || !(a.acceptsSubmissions || a.acceptsLink)) throw new Forbidden("No puedes entregar aquí");
   return a;
 }

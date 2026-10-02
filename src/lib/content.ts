@@ -7,6 +7,7 @@ import { canManageSubject } from "./auth";
 import { createUploadTarget, putObject, removeObject } from "./storage";
 import { hashToken } from "./tokens";
 import { normalizeExtensions } from "./extensions";
+import { daysUntil } from "./time";
 
 // Lógica de contenido compartida por la web y (más adelante) el servidor MCP.
 // Cada función comprueba permisos con el usuario que actúa.
@@ -25,6 +26,16 @@ async function lessonSubject(lessonId: string) {
 
 export const isPublished = (publishAt: Date | null | undefined, now = new Date()) =>
   !!publishAt && publishAt <= now;
+
+// Hasta el día de la sesión el alumnado solo ve su título y fecha: el programa, el material y las
+// tareas aparecen ese día. Un material o tarea con fecha de publicación propia se ve desde esa
+// fecha (por ejemplo, una lectura previa).
+export const sessionStarted = (lesson: { date: Date }, now = new Date()) => daysUntil(lesson.date, now) <= 0;
+export const itemVisible = (
+  item: { publishAt: Date | null },
+  lesson: { publishAt: Date | null; date: Date },
+  now = new Date(),
+) => isPublished(lesson.publishAt, now) && (item.publishAt ? item.publishAt <= now : sessionStarted(lesson, now));
 
 // ---------- Sesiones ----------
 
@@ -180,7 +191,7 @@ export async function fileForDownload(user: User, fileId: string) {
   });
   if (!enrolled) return null;
   const item = f.material ?? f.assessment;
-  if (!item || !isPublished(item.lesson.publishAt) || !isPublished(item.publishAt ?? item.lesson.publishAt)) return null;
+  if (!item || !itemVisible(item, item.lesson)) return null;
   return f;
 }
 
@@ -207,7 +218,10 @@ export async function getTimeline(subjectId: string, canManage: boolean) {
     },
   });
   if (canManage) return lessons;
-  const visible = <T extends { publishAt: Date | null }>(items: T[], lesson: { publishAt: Date | null }) =>
-    items.filter((i) => isPublished(i.publishAt ?? lesson.publishAt, now));
-  return lessons.map((l) => ({ ...l, materials: visible(l.materials, l), assessments: visible(l.assessments, l) }));
+  return lessons.map((l) => ({
+    ...l,
+    plan: sessionStarted(l, now) ? l.plan : "",
+    materials: l.materials.filter((m) => itemVisible(m, l, now)),
+    assessments: l.assessments.filter((a) => itemVisible(a, l, now)),
+  }));
 }
