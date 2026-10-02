@@ -6,13 +6,13 @@ export default async function SubjectLayout({ children, params }: LayoutProps<"/
   const { subject, canManage } = await getSubjectAccess(id);
   return (
     <main className="mx-auto w-full max-w-5xl px-4 py-8">
-      <Link href="/" className="text-sm text-slate-500 hover:text-slate-800">← Mis asignaturas</Link>
-      <h1 className="mt-2 text-2xl font-semibold">{subject.name}</h1>
-      <p className="text-slate-600">{subject.academicYear}{subject.group && ` · Grupo ${subject.group}`}</p>
+      <Link href="/" className="text-sm text-gris hover:text-acento">← Mis asignaturas</Link>
+      <h1 className="mt-2 text-4xl font-semibold tracking-tight">{subject.name}</h1>
+      <p className="text-gris">{subject.academicYear}{subject.group && ` · Grupo ${subject.group}`}</p>
       {canManage && (
-        <nav className="mt-4 flex gap-4 border-b border-slate-200 text-sm">
-          <Link href={`/asignaturas/${id}`} className="pb-2 hover:text-indigo-700">Timeline</Link>
-          <Link href={`/asignaturas/${id}/personas`} className="pb-2 hover:text-indigo-700">Personas</Link>
+        <nav className="mt-4 flex gap-4 border-b border-linea text-sm">
+          <Link href={`/asignaturas/${id}`} className="pb-2 text-acento">Timeline</Link>
+          <Link href={`/asignaturas/${id}/personas`} className="pb-2 text-acento">Personas</Link>
         </nav>
       )}
       <div className="mt-6">{children}</div>

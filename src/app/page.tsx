@@ -22,19 +22,20 @@ export default async function Home() {
 
   return (
     <main className="mx-auto w-full max-w-5xl px-4 py-8">
-      <h1 className="mb-6 text-2xl font-semibold">Mis asignaturas</h1>
+      <h1 className="mb-6 text-4xl font-semibold tracking-tight">Mis asignaturas</h1>
       {subjects.length === 0 ? (
-        <p className="text-slate-600">
+        <p className="text-gris">
           {user.isAdmin ? "Aún no has creado ninguna asignatura." : "Todavía no estás matriculado en ninguna asignatura."}
         </p>
       ) : (
         <ul className="grid gap-4 sm:grid-cols-2">
           {subjects.map((s) => (
             <li key={s.id}>
-              <Link href={`/asignaturas/${s.id}`} className="card block hover:border-indigo-300">
-                <div className="font-medium">{s.name}</div>
-                <div className="text-sm text-slate-600">
-                  {s.academicYear}{s.group && ` · ${s.group}`} · {s._count.enrollments} alumnos
+              <Link href={`/asignaturas/${s.id}`} className="card block transition-colors hover:bg-piedra">
+                <div className="etiqueta">{s.academicYear}{s.group && ` · Grupo ${s.group}`}</div>
+                <div className="mt-1 text-xl font-semibold">{s.name}</div>
+                <div className="text-sm text-gris">
+                  Alumnado: {s._count.enrollments}
                   {s.enrollments[0]?.role === "TEACHER" && " · Profesor"}
                 </div>
               </Link>

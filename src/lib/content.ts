@@ -48,7 +48,7 @@ export async function deleteLesson(actor: User, lessonId: string) {
   const subjectId = await lessonSubject(lessonId);
   await assertManage(actor, subjectId);
   const files = await db.storedFile.findMany({
-    where: { OR: [{ material: { lessonId } }, { assessment: { lessonId } }] },
+    where: { OR: [{ material: { lessonId } }, { assessment: { lessonId } }, { submission: { assessment: { lessonId } } }] },
   });
   await db.lesson.delete({ where: { id: lessonId } });
   await deleteFiles(files);
@@ -61,7 +61,7 @@ export const materialInput = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("TEXT"), title: z.string().trim().min(1).max(200), body: z.string().min(1).max(20000) }),
   z.object({ kind: z.literal("LINK"), title: z.string().trim().min(1).max(200), url: z.url({ protocol: /^https?$/ }) }),
   z.object({ kind: z.literal("FILE"), title: z.string().trim().min(1).max(200), fileId: z.string().min(1) }),
-]).and(z.object({ publishAt: z.date().nullable().default(null) }));
+]).and(z.object({ publishAt: z.date().nullable().default(null), isSlides: z.boolean().default(false) }));
 
 export async function addMaterial(actor: User, lessonId: string, input: z.input<typeof materialInput>) {
   const subjectId = await lessonSubject(lessonId);
@@ -106,8 +106,9 @@ export async function deleteAssessment(actor: User, assessmentId: string) {
   const a = await db.assessment.findUnique({ where: { id: assessmentId }, include: { lesson: true, file: true } });
   if (!a) return null;
   await assertManage(actor, a.lesson.subjectId);
+  const submitted = await db.storedFile.findMany({ where: { submission: { assessmentId } } });
   await db.assessment.delete({ where: { id: a.id } });
-  if (a.file) await deleteFiles([a.file]);
+  await deleteFiles([...(a.file ? [a.file] : []), ...submitted]);
   return a.lesson.subjectId;
 }
 
@@ -138,11 +139,11 @@ export async function startUpload(actor: User, subjectId: string, input: z.input
 // Un archivo solo se puede enlazar una vez y dentro de su asignatura.
 async function claimFile(fileId: string, subjectId: string) {
   const f = await db.storedFile.findUnique({ where: { id: fileId }, include: { material: true, assessment: true } });
-  if (!f || f.subjectId !== subjectId || f.material || f.assessment) throw new Forbidden("Archivo no válido");
+  if (!f || f.subjectId !== subjectId || f.material || f.assessment || f.submissionId) throw new Forbidden("Archivo no válido");
   if (!f.uploadedAt) await db.storedFile.update({ where: { id: f.id }, data: { uploadedAt: new Date() } });
 }
 
-async function deleteFiles(files: { id: string; storageKey: string }[]) {
+export async function deleteFiles(files: { id: string; storageKey: string }[]) {
   for (const f of files) {
     await removeObject(f.storageKey).catch((e) => console.error("[storage] No se pudo borrar", f.storageKey, e));
     await db.storedFile.deleteMany({ where: { id: f.id } });
@@ -153,10 +154,12 @@ async function deleteFiles(files: { id: string; storageKey: string }[]) {
 export async function fileForDownload(user: User, fileId: string) {
   const f = await db.storedFile.findUnique({
     where: { id: fileId },
-    include: { material: { include: { lesson: true } }, assessment: { include: { lesson: true } } },
+    include: { material: { include: { lesson: true } }, assessment: { include: { lesson: true } }, submission: true },
   });
   if (!f) return null;
   if (await canManageSubject(user.id, user.isAdmin, f.subjectId)) return f;
+  // Una entrega solo la ve quien la hizo (y el profesorado, arriba).
+  if (f.submission) return f.submission.studentId === user.id ? f : null;
   const enrolled = await db.enrollment.findUnique({
     where: { userId_subjectId: { userId: user.id, subjectId: f.subjectId } },
   });

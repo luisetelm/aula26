@@ -53,12 +53,12 @@ export function RosterImport({ subjectId }: { subjectId: string }) {
   return (
     <section className="card">
       <h2 className="mb-1 text-lg font-semibold">Importar desde Excel</h2>
-      <p className="mb-4 text-sm text-slate-600">
+      <p className="mb-4 text-sm text-gris">
         Sube el .xlsx o .csv de la escuela. Solo hace falta una columna con el correo; nombre y apellidos son opcionales.
       </p>
 
       {result && (
-        <p className="mb-4 rounded-lg bg-emerald-50 p-3 text-sm text-emerald-900">
+        <p className="mb-4 bg-acento-suave p-3 text-sm">
           Hecho: {result.enrolled} personas añadidas a la asignatura ({result.created} nuevas en Aula26)
           {result.alreadyEnrolled > 0 && `, ${result.alreadyEnrolled} ya estaban`}.
         </p>
@@ -70,7 +70,7 @@ export function RosterImport({ subjectId }: { subjectId: string }) {
           <button disabled={pending} className="btn-secondary">{pending ? "Leyendo…" : "Ver vista previa"}</button>
         </form>
       )}
-      {error && <p className="mt-3 text-sm text-red-700">{error}</p>}
+      {error && <p className="mt-3 text-sm text-aviso">{error}</p>}
 
       {sheet && map && (
         <div className="space-y-4">
@@ -102,14 +102,14 @@ export function RosterImport({ subjectId }: { subjectId: string }) {
 
           {preview && (
             <>
-              <div className="max-h-72 overflow-auto rounded-lg border border-slate-200">
+              <div className="max-h-72 overflow-auto border border-linea">
                 <table className="w-full text-sm">
-                  <thead className="sticky top-0 bg-slate-100 text-left">
+                  <thead className="sticky top-0 bg-acento-suave text-left">
                     <tr><th className="px-3 py-2">Correo</th><th>Nombre</th><th>Apellidos</th><th>Rol</th></tr>
                   </thead>
                   <tbody>
                     {preview.entries.slice(0, 50).map((e) => (
-                      <tr key={e.email} className="border-t border-slate-100">
+                      <tr key={e.email} className="border-t border-linea">
                         <td className="px-3 py-1">{e.email}</td>
                         <td>{e.firstName}</td>
                         <td>{e.lastName}</td>
@@ -119,7 +119,7 @@ export function RosterImport({ subjectId }: { subjectId: string }) {
                   </tbody>
                 </table>
               </div>
-              <p className="text-sm text-slate-600">
+              <p className="text-sm text-gris">
                 {preview.entries.length} personas listas para importar
                 {preview.entries.length > 50 && " (se muestran las 50 primeras)"}.
                 {preview.invalid.length > 0 &&

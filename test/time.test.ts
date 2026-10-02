@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseLocal, toLocalInput } from "@/lib/time";
+import { daysUntil, parseLocal, relativeDay, toLocalInput } from "@/lib/time";
 
 describe("time", () => {
   it("interpreta la hora en Madrid en invierno y en verano", () => {
@@ -16,5 +16,13 @@ describe("time", () => {
     const d = parseLocal("2026-03-29T03:15", "Europe/Madrid")!; // día del cambio de hora
     expect(toLocalInput(d, "Europe/Madrid")).toBe("2026-03-29T03:15");
     expect(toLocalInput(parseLocal("2026-11-02T18:00", "Europe/Madrid"), "Europe/Madrid")).toBe("2026-11-02T18:00");
+  });
+
+  it("cuenta días de calendario en Madrid, no horas", () => {
+    const now = parseLocal("2026-10-01T23:30", "Europe/Madrid")!;
+    expect(daysUntil(parseLocal("2026-10-02T00:10", "Europe/Madrid")!, now, "Europe/Madrid")).toBe(1);
+    expect(daysUntil(parseLocal("2026-10-01T08:00", "Europe/Madrid")!, now, "Europe/Madrid")).toBe(0);
+    expect(relativeDay(parseLocal("2026-10-04T10:00", "Europe/Madrid")!, now, "Europe/Madrid")).toBe("en 3 días");
+    expect(relativeDay(parseLocal("2026-09-30T10:00", "Europe/Madrid")!, now, "Europe/Madrid")).toBe("ayer");
   });
 });
