@@ -49,6 +49,12 @@ export async function gradeAction(
   return { ok: true };
 }
 
+export async function discardProposalAction(subjectId: string, assessmentId: string, studentId: string) {
+  const user = await requireUser();
+  await subs.discardProposal(user, assessmentId, studentId);
+  refresh(subjectId);
+}
+
 export async function publishGradesAction(subjectId: string, assessmentId: string, published: boolean) {
   const user = await requireUser();
   await subs.setGradesPublished(user, assessmentId, published);

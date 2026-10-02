@@ -26,6 +26,7 @@ export default async function EntregasPage({ params }: PageProps<"/asignaturas/[
 
   const cuenta = (s: SubmissionStatus) => rows.filter((r) => r.status === s).length;
   const corregidas = rows.filter((r) => r.submission?.gradedAt).length;
+  const propuestas = rows.filter((r) => r.submission?.draftedAt).length;
   const notas = rows.map((r) => r.submission?.grade).filter((g): g is number => g !== null && g !== undefined);
   const media = notas.length ? notas.reduce((t, g) => t + g, 0) / notas.length : null;
 
@@ -64,6 +65,11 @@ export default async function EntregasPage({ params }: PageProps<"/asignaturas/[
               ? "Cada alumno ve su nota y tu comentario en la tarea."
               : "Corrige con calma: el alumnado no verá nada hasta que publiques."}
           </p>
+          {propuestas > 0 && (
+            <p className="mt-1 text-sm font-medium text-acento">
+              {propuestas === 1 ? "Hay 1 propuesta de Claude por revisar." : `Hay ${propuestas} propuestas de Claude por revisar.`}
+            </p>
+          )}
         </div>
         <form action={publishGradesAction.bind(null, id, a.id, !a.gradesPublished)}>
           <button className={a.gradesPublished ? "btn-secondary" : "btn-primary"}>
@@ -114,6 +120,7 @@ export default async function EntregasPage({ params }: PageProps<"/asignaturas/[
                   studentId={student.id}
                   grade={s?.grade ?? null}
                   feedback={s?.feedback ?? ""}
+                  proposal={s?.draftedAt ? { grade: s.draftGrade, feedback: s.draftFeedback } : null}
                 />
               </li>
             );

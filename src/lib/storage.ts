@@ -59,4 +59,13 @@ export function readLocal(storageKey: string) {
   return readFile(localPath(storageKey));
 }
 
+// Contenido de un archivo (para que Claude lo lea por el conector).
+export async function readObject(storageKey: string): Promise<Buffer> {
+  const sb = supabase();
+  if (!sb) return readLocal(storageKey);
+  const { data, error } = await sb.storage.from(BUCKET).download(storageKey);
+  if (error) throw error;
+  return Buffer.from(await data.arrayBuffer());
+}
+
 export const usingSupabase = () => supabase() !== null;

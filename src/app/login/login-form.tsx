@@ -3,13 +3,14 @@
 import { useActionState } from "react";
 import { loginWithCode, requestLogin, type CodeState, type LoginState } from "./actions";
 
-export function LoginForm() {
+export function LoginForm({ next }: { next: string }) {
   const [state, action, pending] = useActionState<LoginState, FormData>(requestLogin, { status: "idle" });
 
-  if (state.status === "sent") return <CodeForm email={state.email ?? ""} message={state.message ?? ""} />;
+  if (state.status === "sent") return <CodeForm email={state.email ?? ""} message={state.message ?? ""} next={next} />;
 
   return (
     <form action={action} className="space-y-4">
+      <input type="hidden" name="next" value={next} />
       <label className="block">
         <span className="text-sm font-medium">Correo de la escuela</span>
         <input
@@ -29,13 +30,14 @@ export function LoginForm() {
   );
 }
 
-function CodeForm({ email, message }: { email: string; message: string }) {
+function CodeForm({ email, message, next }: { email: string; message: string; next: string }) {
   const [state, action, pending] = useActionState<CodeState, FormData>(loginWithCode, {});
   return (
     <div className="space-y-4">
       <p className="bg-acento-suave p-4">{message}</p>
       <form action={action} className="space-y-4">
         <input type="hidden" name="email" value={email} />
+        <input type="hidden" name="next" value={next} />
         <label className="block">
           <span className="text-sm font-medium">Código del correo</span>
           <input

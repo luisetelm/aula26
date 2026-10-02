@@ -19,6 +19,8 @@ model User {
   sessions    Session[]
   files       StoredFile[]
   submissions Submission[]
+  oauthCodes  OAuthCode[]
+  oauthTokens OAuthToken[]
 }
 
 model Subject {
@@ -162,19 +164,69 @@ model StoredFile {
 
 // Entrega de un alumno en una prueba. submittedAt nulo: solo tiene nota (no entregó).
 model Submission {
-  id           String       @id @default(cuid())
-  assessmentId String
-  studentId    String
-  note         String       @default("")
-  submittedAt  DateTime?
-  grade        Float?
-  feedback     String       @default("")
-  gradedAt     DateTime?
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
-  assessment   Assessment   @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
-  student      User         @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  files        StoredFile[]
+  id            String       @id @default(cuid())
+  assessmentId  String
+  studentId     String
+  note          String       @default("")
+  submittedAt   DateTime?
+  grade         Float?
+  feedback      String       @default("")
+  gradedAt      DateTime?
+  // Propuesta de Claude (vía conector). Solo la ve el profesorado hasta que la acepta.
+  draftGrade    Float?
+  draftFeedback String       @default("")
+  draftedAt     DateTime?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  assessment    Assessment   @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  student       User         @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  files         StoredFile[]
 
   @@unique([assessmentId, studentId])
+}
+
+// ---------- Conector de Claude (OAuth 2.1 + MCP) ----------
+
+// Aplicación que se ha registrado sola (registro dinámico), por ejemplo Claude.
+model OAuthClient {
+  id           String       @id @default(cuid())
+  name         String       @default("")
+  redirectUris String[]
+  createdAt    DateTime     @default(now())
+  codes        OAuthCode[]
+  tokens       OAuthToken[]
+}
+
+// Código de autorización de un solo uso (PKCE). Solo guardamos su hash.
+model OAuthCode {
+  id            String      @id @default(cuid())
+  codeHash      String      @unique
+  clientId      String
+  userId        String
+  redirectUri   String
+  codeChallenge String
+  expiresAt     DateTime
+  usedAt        DateTime?
+  createdAt     DateTime    @default(now())
+  client        OAuthClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+enum OAuthTokenKind {
+  ACCESS
+  REFRESH
+}
+
+model OAuthToken {
+  id        String         @id @default(cuid())
+  tokenHash String         @unique
+  kind      OAuthTokenKind
+  clientId  String
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime       @default(now())
+  client    OAuthClient    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }

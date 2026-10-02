@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
+import { Icono } from "@/components/icono";
 import { createSubject } from "./actions";
 
 function currentAcademicYear() {
@@ -42,6 +43,17 @@ export default async function Home() {
             </li>
           ))}
         </ul>
+      )}
+
+      {(user.isAdmin || subjects.some((s) => s.enrollments[0]?.role === "TEACHER")) && (
+        <Link href="/claude" className="card mt-10 flex items-center justify-between gap-4 transition-colors hover:bg-piedra">
+          <span>
+            <span className="etiqueta">Conector</span>
+            <span className="mt-1 block text-lg font-semibold">Claude en Aula26</span>
+            <span className="block text-sm text-gris">Programa sesiones y prepara correcciones desde Claude.</span>
+          </span>
+          <Icono nombre="flecha" className="h-6 w-6 shrink-0 text-acento" />
+        </Link>
       )}
 
       {user.isAdmin && (

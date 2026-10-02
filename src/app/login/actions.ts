@@ -7,6 +7,7 @@ import { timingSafeEqual } from "node:crypto";
 import { redirect } from "next/navigation";
 import { hashToken, newCode, newToken, normalizeEmail } from "@/lib/tokens";
 import { createSession, isBootstrapAdmin } from "@/lib/auth";
+import { safeNext } from "@/lib/next-path";
 
 const TOKEN_MINUTES = 15;
 const MAX_PER_HOUR = 5;
@@ -50,8 +51,10 @@ export async function requestLogin(_prev: LoginState, formData: FormData): Promi
     },
   });
   const appUrl = process.env.APP_URL ?? "http://localhost:3000";
+  const next = safeNext(formData.get("next"));
+  const link = `${appUrl}/auth/verify?token=${encodeURIComponent(token)}${next === "/" ? "" : `&next=${encodeURIComponent(next)}`}`;
   try {
-    await sendLoginEmail(email, `${appUrl}/auth/verify?token=${encodeURIComponent(token)}`, code);
+    await sendLoginEmail(email, link, code);
   } catch (err) {
     console.error("[mail] Error enviando el enlace", err);
     return { status: "error", message: "No se ha podido enviar el correo. Inténtalo de nuevo en unos minutos." };
@@ -85,5 +88,5 @@ export async function loginWithCode(_prev: CodeState, formData: FormData): Promi
   const user = await db.user.findUnique({ where: { email } });
   if (count !== 1 || !user) return { error: "El código ha caducado o ya se ha usado. Pide uno nuevo." };
   await createSession(user.id);
-  redirect("/");
+  redirect(safeNext(formData.get("next")));
 }

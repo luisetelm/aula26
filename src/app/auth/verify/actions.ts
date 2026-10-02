@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { createSession } from "@/lib/auth";
 import { hashToken } from "@/lib/tokens";
+import { safeNext } from "@/lib/next-path";
 
 export async function consumeLogin(formData: FormData) {
   const token = String(formData.get("token") ?? "");
@@ -22,5 +23,5 @@ export async function consumeLogin(formData: FormData) {
   if (!user) redirect("/auth/verify?error=1");
 
   await createSession(user.id);
-  redirect("/");
+  redirect(safeNext(formData.get("next")));
 }

@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { Portada } from "@/components/portada";
+import { safeNext } from "@/lib/next-path";
 import { consumeLogin } from "./actions";
 
 // El enlace del correo abre esta página y el acceso se confirma con un botón (POST),
 // para que los antivirus que abren enlaces automáticamente no lo gasten.
 export default async function VerifyPage({ searchParams }: PageProps<"/auth/verify">) {
-  const { token, error } = await searchParams;
+  const { token, error, next } = await searchParams;
   const valid = typeof token === "string" && token.length > 0;
 
   return (
@@ -19,6 +20,7 @@ export default async function VerifyPage({ searchParams }: PageProps<"/auth/veri
       ) : (
         <form action={consumeLogin}>
           <input type="hidden" name="token" value={token} />
+          <input type="hidden" name="next" value={safeNext(next)} />
           <button className="btn-primary w-full">Entrar en Aula26</button>
         </form>
       )}

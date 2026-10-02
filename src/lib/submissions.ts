@@ -108,10 +108,36 @@ export async function gradeSubmission(actor: User, assessmentId: string, student
   if (enrolled?.role !== "STUDENT") throw new Forbidden("No es alumno de la asignatura");
   const data = gradeInput.parse(input);
   const gradedAt = data.grade === null && !data.feedback.trim() ? null : new Date();
+  // Al guardar la nota, la propuesta de Claude ya está revisada y se descarta.
+  const draft = { draftGrade: null, draftFeedback: "", draftedAt: null };
   return db.submission.upsert({
     where: { assessmentId_studentId: { assessmentId, studentId } },
-    create: { assessmentId, studentId, ...data, gradedAt },
-    update: { ...data, gradedAt },
+    create: { assessmentId, studentId, ...data, gradedAt, ...draft },
+    update: { ...data, gradedAt, ...draft },
+  });
+}
+
+// Propuesta de nota (de Claude, por el conector). No cuenta ni la ve el alumnado: el profesor la acepta o la cambia.
+export async function proposeGrade(actor: User, assessmentId: string, studentId: string, input: z.input<typeof gradeInput>) {
+  const a = await assertManageAssessment(actor, assessmentId);
+  const enrolled = await db.enrollment.findUnique({
+    where: { userId_subjectId: { userId: studentId, subjectId: a.lesson.subjectId } },
+  });
+  if (enrolled?.role !== "STUDENT") throw new Forbidden("No es alumno de la asignatura");
+  const data = gradeInput.parse(input);
+  const draft = { draftGrade: data.grade, draftFeedback: data.feedback, draftedAt: new Date() };
+  return db.submission.upsert({
+    where: { assessmentId_studentId: { assessmentId, studentId } },
+    create: { assessmentId, studentId, ...draft },
+    update: draft,
+  });
+}
+
+export async function discardProposal(actor: User, assessmentId: string, studentId: string) {
+  await assertManageAssessment(actor, assessmentId);
+  await db.submission.updateMany({
+    where: { assessmentId, studentId },
+    data: { draftGrade: null, draftFeedback: "", draftedAt: null },
   });
 }
 
@@ -156,10 +182,14 @@ export async function getMySubmissions(studentId: string, assessmentIds: string[
     include: { files: { orderBy: { createdAt: "asc" } }, assessment: { select: { gradesPublished: true } } },
   });
   return new Map(
+    // Fuera la propuesta de Claude: el alumnado no la ve nunca.
     subs.map((s) => [
       s.assessmentId,
       {
         ...s,
+        draftGrade: null,
+        draftFeedback: "",
+        draftedAt: null,
         grade: s.assessment.gradesPublished ? s.grade : null,
         feedback: s.assessment.gradesPublished ? s.feedback : "",
         graded: !!s.gradedAt,
