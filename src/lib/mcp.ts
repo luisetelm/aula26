@@ -6,7 +6,8 @@ import { z } from "zod";
 import type { User } from "@prisma/client";
 import { db } from "./db";
 import { canManageSubject } from "./auth";
-import { Forbidden, addAssessment, addMaterial, createLesson, fileForDownload, getTimeline, isPublished, updateLesson } from "./content";
+import { Forbidden, addAssessment, addMaterial, createLesson, fileForDownload, getTimeline, isPublished, startUpload, storeFile, updateLesson } from "./content";
+import { appUrl } from "./oauth";
 import { COMPLETION_DONE, getSubmissionsOverview, proposeGrade } from "./submissions";
 import { readObject } from "./storage";
 import { parseLocal, toLocalInput } from "./time";
@@ -22,6 +23,11 @@ const INSTRUCTIONS = `Aula26 es el aula virtual del profesor. El alumnado es uni
 - El programa de una sesión es Markdown; cada paso en una línea que empiece por "- " y, si quieres, con la duración al final: "- Repaso de la sesión anterior (10 min)".
 - Para evaluar: ver_entregas, leer_archivo de cada archivo y proponer_nota. El comentario va dirigido al estudiante: directo, concreto y argumentado con los criterios de la rúbrica, como en una revisión profesional. El profesor revisa cada propuesta antes de que cuente.
 - Hay dos tipos de tarea: "nota" (de 0 a 10) y "entregada / no entregada" (tareas de clase de la PAC). En estas últimas, propón entregada si la entrega cumple lo pedido y no entregada si falta o no cumple, explicando por qué.
+- Para subir un archivo (diapositivas, enunciado en PDF, plantilla…):
+  · Si lo generas tú y es de texto (Markdown, HTML, CSV…), usa subir_archivo con el texto.
+  · Si es pequeño (menos de 100 KB), puedes usar subir_archivo con el contenido en base64.
+  · Si es un archivo que te ha adjuntado el profesor o es grande, y tienes un entorno para ejecutar código con internet, usa preparar_subida, ejecuta el comando curl que devuelve sobre el archivo y después anadir_material con tipo archivo.
+  · Si el comando falla por falta de red, dile al profesor que añada el dominio del enlace a los dominios permitidos de la ejecución de código en su configuración de Claude, o que suba el archivo desde la sesión en Aula26.
 - Si una entrega es un enlace de Figma, revísalo con el conector de Figma (captura, estructura y contexto de diseño) si lo tienes disponible. Si no puedes abrirlo, dilo en vez de inventar la evaluación.`;
 
 const ok = (data: unknown): CallToolResult => ({ content: [{ type: "text", text: JSON.stringify(data, null, 1) }] });
@@ -59,6 +65,16 @@ function run<A>(fn: (args: A) => Promise<CallToolResult>) {
     }
   };
 }
+
+const MAX_INLINE_BYTES = 3 * 1024 * 1024;
+const MIME: Record<string, string> = {
+  pdf: "application/pdf", png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif", webp: "image/webp", svg: "image/svg+xml",
+  md: "text/markdown", txt: "text/plain", html: "text/html", csv: "text/csv", json: "application/json", zip: "application/zip",
+  pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+};
+const mimeFor = (name: string) => MIME[/\.([^.]+)$/.exec(name.toLowerCase())?.[1] ?? ""] ?? "application/octet-stream";
 
 const MAX_READ_BYTES = 15 * 1024 * 1024;
 const MAX_TEXT_CHARS = 200_000;
@@ -177,24 +193,92 @@ export function buildMcpServer(actor: User) {
     "anadir_material",
     {
       title: "Añadir material",
-      description: "Añade un texto (Markdown) o un enlace a una sesión en borrador.",
+      description: "Añade un texto (Markdown), un enlace o un archivo ya subido con preparar_subida a una sesión en borrador.",
       inputSchema: {
         sesion_id: z.string(),
-        tipo: z.enum(["texto", "enlace"]),
+        tipo: z.enum(["texto", "enlace", "archivo"]),
         titulo: z.string(),
         texto: z.string().optional().describe("Para tipo texto: contenido en Markdown"),
         url: z.string().optional().describe("Para tipo enlace"),
-        diapositivas: z.boolean().default(false).describe("Si el enlace son las diapositivas de la sesión"),
+        archivo_id: z.string().optional().describe("Para tipo archivo: el que devolvió preparar_subida, ya subido"),
+        diapositivas: z.boolean().default(false).describe("Si son las diapositivas de la sesión"),
       },
       annotations: escritura,
     },
-    run(async (a: { sesion_id: string; tipo: "texto" | "enlace"; titulo: string; texto?: string; url?: string; diapositivas: boolean }) => {
+    run(async (a: { sesion_id: string; tipo: "texto" | "enlace" | "archivo"; titulo: string; texto?: string; url?: string; archivo_id?: string; diapositivas: boolean }) => {
       await draftLesson(actor, a.sesion_id);
+      if (a.tipo === "archivo") {
+        const f = a.archivo_id ? await db.storedFile.findUnique({ where: { id: a.archivo_id } }) : null;
+        if (!f || f.uploadedById !== actor.id) throw new Forbidden("El archivo no existe");
+        if (!f.uploadedAt && f.uploadTokenHash) {
+          // Subido directamente al almacenamiento: comprobamos que está antes de enlazarlo.
+          const exists = await readObject(f.storageKey).then(() => true, () => false);
+          if (!exists) throw new Forbidden("El archivo todavía no se ha subido. Ejecuta primero el comando de preparar_subida");
+        }
+      }
       const m =
         a.tipo === "texto"
           ? await addMaterial(actor, a.sesion_id, { kind: "TEXT", title: a.titulo, body: a.texto ?? "", isSlides: a.diapositivas })
-          : await addMaterial(actor, a.sesion_id, { kind: "LINK", title: a.titulo, url: a.url ?? "", isSlides: a.diapositivas });
+          : a.tipo === "enlace"
+            ? await addMaterial(actor, a.sesion_id, { kind: "LINK", title: a.titulo, url: a.url ?? "", isSlides: a.diapositivas })
+            : await addMaterial(actor, a.sesion_id, { kind: "FILE", title: a.titulo, fileId: a.archivo_id ?? "", isSlides: a.diapositivas });
       return ok({ material_id: m.id });
+    }),
+  );
+
+  server.registerTool(
+    "subir_archivo",
+    {
+      title: "Subir archivo",
+      description:
+        "Sube un archivo (hasta 3 MB) como material de una sesión en borrador: PDF, diapositivas, plantilla, imagen… Pasa el contenido en base64, o en texto si es un archivo de texto (.md, .html, .csv…).",
+      inputSchema: {
+        sesion_id: z.string(),
+        titulo: z.string().describe("Cómo se verá en la sesión"),
+        nombre_archivo: z.string().describe("Con extensión, por ejemplo tema3.pdf"),
+        contenido_base64: z.string().optional(),
+        texto: z.string().optional().describe("En lugar de base64, para archivos de texto"),
+        tipo_mime: z.string().optional().describe("Por ejemplo application/pdf. Si no lo pones, se deduce de la extensión"),
+        diapositivas: z.boolean().default(false).describe("Si son las diapositivas de la sesión"),
+      },
+      annotations: escritura,
+    },
+    run(async (a: { sesion_id: string; titulo: string; nombre_archivo: string; contenido_base64?: string; texto?: string; tipo_mime?: string; diapositivas: boolean }) => {
+      const lesson = await draftLesson(actor, a.sesion_id);
+      const data =
+        a.contenido_base64 !== undefined ? Buffer.from(a.contenido_base64.replace(/^data:[^,]*,/, ""), "base64") : a.texto !== undefined ? Buffer.from(a.texto, "utf8") : null;
+      if (!data || data.length === 0) return fail("Falta el contenido: pasa contenido_base64 o texto.");
+      if (data.length > MAX_INLINE_BYTES) return fail("Es demasiado grande para mandarlo así (máximo 3 MB). Usa preparar_subida.");
+      const f = await storeFile(actor, lesson.subjectId, { name: a.nombre_archivo, mimeType: a.tipo_mime || mimeFor(a.nombre_archivo), data });
+      const m = await addMaterial(actor, a.sesion_id, { kind: "FILE", title: a.titulo, fileId: f.id, isSlides: a.diapositivas });
+      return ok({ material_id: m.id, archivo: f.name, bytes: f.size });
+    }),
+  );
+
+  server.registerTool(
+    "preparar_subida",
+    {
+      title: "Preparar subida de un archivo grande",
+      description:
+        "Para archivos de hasta 50 MB que tengas en un entorno de ejecución de código con internet. Devuelve un comando curl para subirlo; después usa anadir_material con tipo archivo y el archivo_id.",
+      inputSchema: {
+        sesion_id: z.string(),
+        nombre_archivo: z.string(),
+        bytes: z.number().int().positive(),
+        tipo_mime: z.string().optional(),
+      },
+      annotations: escritura,
+    },
+    run(async (a: { sesion_id: string; nombre_archivo: string; bytes: number; tipo_mime?: string }) => {
+      const lesson = await draftLesson(actor, a.sesion_id);
+      const t = await startUpload(actor, lesson.subjectId, { name: a.nombre_archivo, size: a.bytes, mimeType: a.tipo_mime || mimeFor(a.nombre_archivo) });
+      const url = t.url.startsWith("/") ? `${appUrl()}${t.url}` : t.url;
+      const headers = Object.entries({ ...t.headers, "x-upsert": "false" }).map(([k, v]) => `-H '${k}: ${v}'`).join(" ");
+      return ok({
+        archivo_id: t.fileId,
+        comando: `curl -sS -X PUT ${headers} -F 'cacheControl=3600' -F 'file=@${a.nombre_archivo.replace(/'/g, "")}' '${url}'`,
+        nota: "Ejecuta el comando en la carpeta del archivo. El enlace caduca en unas horas.",
+      });
     }),
   );
 

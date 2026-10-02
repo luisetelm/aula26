@@ -59,6 +59,14 @@ export function readLocal(storageKey: string) {
   return readFile(localPath(storageKey));
 }
 
+// Subida desde el servidor (archivos que manda Claude por el conector).
+export async function putObject(storageKey: string, data: Buffer, mimeType: string) {
+  const sb = supabase();
+  if (!sb) return writeLocal(storageKey, data);
+  const { error } = await sb.storage.from(BUCKET).upload(storageKey, data, { contentType: mimeType, upsert: false });
+  if (error) throw error;
+}
+
 // Contenido de un archivo (para que Claude lo lea por el conector).
 export async function readObject(storageKey: string): Promise<Buffer> {
   const sb = supabase();

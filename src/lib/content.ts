@@ -4,7 +4,7 @@ import { z } from "zod";
 import type { User } from "@prisma/client";
 import { db } from "./db";
 import { canManageSubject } from "./auth";
-import { createUploadTarget, removeObject } from "./storage";
+import { createUploadTarget, putObject, removeObject } from "./storage";
 import { hashToken } from "./tokens";
 import { normalizeExtensions } from "./extensions";
 
@@ -127,17 +127,28 @@ export const uploadInput = z.object({
 });
 
 // Reserva un archivo y devuelve adónde subirlo. El navegador lo sube directamente al almacenamiento.
+const storageKeyFor = (subjectId: string, name: string) =>
+  `${subjectId}/${randomBytes(12).toString("hex")}/${name.normalize("NFD").replace(/[^\w.-]+/g, "_").slice(-100)}`;
+
 export async function startUpload(actor: User, subjectId: string, input: z.input<typeof uploadInput>) {
   await assertManage(actor, subjectId);
   const meta = uploadInput.parse(input);
-  const safeName = meta.name.normalize("NFD").replace(/[^\w.-]+/g, "_").slice(-100);
-  const storageKey = `${subjectId}/${randomBytes(12).toString("hex")}/${safeName}`;
+  const storageKey = storageKeyFor(subjectId, meta.name);
   const token = randomBytes(24).toString("base64url");
   const file = await db.storedFile.create({
     data: { subjectId, storageKey, uploadedById: actor.id, ...meta, uploadTokenHash: hashToken(token) },
   });
   const target = await createUploadTarget(storageKey, `/api/archivos/${file.id}/subir?token=${token}`);
   return { fileId: file.id, ...target };
+}
+
+// Guarda un archivo que llega entero al servidor (por ejemplo, desde el conector de Claude).
+export async function storeFile(actor: User, subjectId: string, input: { name: string; mimeType: string; data: Buffer }) {
+  await assertManage(actor, subjectId);
+  const meta = uploadInput.parse({ name: input.name, size: input.data.length, mimeType: input.mimeType });
+  const storageKey = storageKeyFor(subjectId, meta.name);
+  await putObject(storageKey, input.data, meta.mimeType);
+  return db.storedFile.create({ data: { subjectId, storageKey, uploadedById: actor.id, ...meta, uploadedAt: new Date() } });
 }
 
 // Un archivo solo se puede enlazar una vez y dentro de su asignatura.
