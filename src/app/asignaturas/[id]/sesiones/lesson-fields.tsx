@@ -28,7 +28,7 @@ export function LessonFields({ lesson }: { lesson?: Lesson }) {
         />
       </label>
       <fieldset className="flex flex-wrap items-center gap-4 text-sm">
-        <legend className="mb-1">Visible para los alumnos</legend>
+        <legend className="mb-1">Visible para el alumnado</legend>
         <label className="flex items-center gap-1"><input type="radio" name="publishMode" value="now" defaultChecked={mode === "now"} /> Ya</label>
         <label className="flex items-center gap-1"><input type="radio" name="publishMode" value="at" defaultChecked={mode === "at"} /> Desde</label>
         <input name="publishAt" type="datetime-local" defaultValue={mode === "at" ? toLocalInput(lesson?.publishAt) : ""} className="input py-1" />

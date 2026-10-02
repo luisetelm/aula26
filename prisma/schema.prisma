@@ -120,6 +120,11 @@ model Material {
   @@index([lessonId])
 }
 
+enum GradingMode {
+  SCORE // nota de 0 a 10
+  COMPLETION // entregada / no entregada (por ejemplo, tareas de clase de la PAC)
+}
+
 model Assessment {
   id                 String       @id @default(cuid())
   lessonId           String
@@ -128,7 +133,10 @@ model Assessment {
   dueAt              DateTime?
   weight             Float        @default(0)
   rubric             String       @default("")
-  acceptsSubmissions Boolean      @default(false)
+  acceptsSubmissions Boolean      @default(false) // entregan archivos
+  acceptsLink        Boolean      @default(false) // entregan un enlace (Figma, web…)
+  allowedExtensions  String       @default("") // "pdf,fig"; vacío = cualquiera
+  gradingMode        GradingMode  @default(SCORE)
   fileId             String?      @unique
   publishAt          DateTime?
   gradesPublished    Boolean      @default(false) // el alumnado ve su nota y comentario
@@ -168,6 +176,7 @@ model Submission {
   assessmentId  String
   studentId     String
   note          String       @default("")
+  url           String       @default("") // enlace entregado (Figma, web…)
   submittedAt   DateTime?
   grade         Float?
   feedback      String       @default("")

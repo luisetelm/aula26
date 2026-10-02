@@ -6,6 +6,7 @@ import { db } from "./db";
 import { canManageSubject } from "./auth";
 import { createUploadTarget, removeObject } from "./storage";
 import { hashToken } from "./tokens";
+import { normalizeExtensions } from "./extensions";
 
 // Lógica de contenido compartida por la web y (más adelante) el servidor MCP.
 // Cada función comprueba permisos con el usuario que actúa.
@@ -90,6 +91,9 @@ export const assessmentInput = z.object({
   weight: z.number().min(0).max(100).default(0),
   rubric: z.string().max(20000).default(""),
   acceptsSubmissions: z.boolean().default(false),
+  acceptsLink: z.boolean().default(false),
+  allowedExtensions: z.string().max(200).default("").transform(normalizeExtensions),
+  gradingMode: z.enum(["SCORE", "COMPLETION"]).default("SCORE"),
   fileId: z.string().nullable().default(null),
   publishAt: z.date().nullable().default(null),
 });

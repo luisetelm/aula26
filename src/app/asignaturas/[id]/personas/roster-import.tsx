@@ -93,8 +93,8 @@ export function RosterImport({ subjectId }: { subjectId: string }) {
             <label className="flex flex-col text-sm">
               Importar como
               <select className="input mt-1" value={roleMode} onChange={(ev) => setRoleMode(ev.target.value as RoleMode)}>
-                <option value="STUDENT">Todos alumnos</option>
-                <option value="TEACHER">Todos profesores</option>
+                <option value="STUDENT">Todo alumnado</option>
+                <option value="TEACHER">Todo profesorado</option>
                 <option value="COLUMN" disabled={map.role < 0}>Según la columna Rol</option>
               </select>
             </label>

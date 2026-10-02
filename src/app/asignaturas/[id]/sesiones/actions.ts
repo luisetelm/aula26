@@ -84,6 +84,9 @@ export type AssessmentForm = {
   weight: number;
   rubric: string;
   acceptsSubmissions: boolean;
+  acceptsLink: boolean;
+  allowedExtensions: string;
+  gradingMode: "SCORE" | "COMPLETION";
   fileId: string | null;
   publishAt: string;
 };

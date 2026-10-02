@@ -15,7 +15,7 @@ export async function startSubmissionUploadAction(assessmentId: string, meta: { 
 export async function submitAction(
   subjectId: string,
   assessmentId: string,
-  input: { fileIds: string[]; note: string },
+  input: { fileIds: string[]; note: string; url: string },
 ): Promise<{ error?: string }> {
   const user = await requireUser();
   try {

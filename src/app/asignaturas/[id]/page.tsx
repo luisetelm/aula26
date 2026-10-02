@@ -22,6 +22,8 @@ type Entregas = {
   students: number;
 };
 
+const conEntrega = (a: { acceptsSubmissions: boolean; acceptsLink: boolean }) => a.acceptsSubmissions || a.acceptsLink;
+
 const materialHref = (m: Material) => (m.kind === "FILE" && m.file ? `/api/archivos/${m.file.id}` : m.kind === "LINK" ? m.url : null);
 
 // Chip de plazo: ocre cuando apremia, apagado cuando ya pasó.
@@ -58,7 +60,7 @@ export default async function SubjectTimeline({ params }: PageProps<"/asignatura
   const { user, canManage } = await getSubjectAccess(id);
   const lessons = await getTimeline(id, canManage);
   const now = new Date();
-  const ids = lessons.flatMap((l) => l.assessments.filter((a) => a.acceptsSubmissions).map((a) => a.id));
+  const ids = lessons.flatMap((l) => l.assessments.filter(conEntrega).map((a) => a.id));
   const entregas: Entregas = {
     subjectId: id,
     mine: canManage ? null : await getMySubmissions(user.id, ids),
@@ -138,7 +140,7 @@ function Resumen({
         <p className="etiqueta text-ocre!">{canManage ? "Tareas abiertas" : "Tareas pendientes"}</p>
         <p className="mt-1 font-mono text-6xl font-medium">{pendientes.length}</p>
         {pendientes.length === 0 ? (
-          <p className="mt-2 text-niebla">{canManage ? "Ninguna con plazo abierto." : "Nada pendiente. Bien."}</p>
+          <p className="mt-2 text-niebla">{canManage ? "Ninguna con plazo abierto." : "No tienes entregas pendientes."}</p>
         ) : (
           <ul className="mt-3 space-y-2">
             {pendientes.slice(0, 3).map((a) => (
@@ -206,7 +208,7 @@ function Sesion({
 
         {l.plan.trim() && (
           <section>
-            <h3 className="etiqueta mb-3">Qué haremos</h3>
+            <h3 className="etiqueta mb-3">Programa de la sesión</h3>
             <Programa plan={l.plan} />
           </section>
         )}
@@ -261,6 +263,7 @@ function Tarea({ a, canManage, now, entregas }: { a: Assessment; canManage: bool
         <span className="etiqueta inline-flex items-center gap-1 text-papel!"><Icono nombre="entrega" className="h-4 w-4" />Tarea</span>
         {a.dueAt && <Plazo dueAt={a.dueAt} now={now} oscuro />}
         {a.weight > 0 && <span className="badge text-papel">{a.weight}% de la nota</span>}
+        {a.gradingMode === "COMPLETION" && <span className="badge text-papel">Se valora entregada / no entregada</span>}
         {canManage && a.publishAt && <PublishBadge publishAt={a.publishAt} oscuro />}
       </div>
       <h3 className="mt-2 text-xl font-semibold">{a.title}</h3>
@@ -271,7 +274,7 @@ function Tarea({ a, canManage, now, entregas }: { a: Assessment; canManage: bool
           <Icono nombre="lectura" className="h-4 w-4" />{a.file.name}
         </a>
       )}
-      {a.acceptsSubmissions && canManage && (
+      {conEntrega(a) && canManage && (
         <Link
           href={`/asignaturas/${entregas.subjectId}/tareas/${a.id}`}
           className="mt-4 inline-flex items-center gap-2 bg-ocre px-4 py-2 font-medium text-grafito hover:bg-papel"
@@ -280,13 +283,18 @@ function Tarea({ a, canManage, now, entregas }: { a: Assessment; canManage: bool
           <Icono nombre="flecha" className="h-4 w-4" />
         </Link>
       )}
-      {a.acceptsSubmissions && !canManage && (
+      {conEntrega(a) && !canManage && (
         <EntregaAlumno
           subjectId={entregas.subjectId}
           assessmentId={a.id}
           status={submissionStatus(a.dueAt, mine?.submittedAt, now)}
           submittedAt={mine?.submittedAt ? formatDateTime(mine.submittedAt) : null}
           note={mine?.note ?? ""}
+          url={mine?.url ?? ""}
+          acceptsFiles={a.acceptsSubmissions}
+          acceptsLink={a.acceptsLink}
+          allowedExtensions={a.allowedExtensions}
+          completion={a.gradingMode === "COMPLETION"}
           files={mine?.files.map((f) => ({ id: f.id, name: f.name, size: f.size })) ?? []}
           graded={mine?.graded ?? false}
           grade={mine?.grade ?? null}

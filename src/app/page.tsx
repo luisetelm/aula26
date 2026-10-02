@@ -26,7 +26,7 @@ export default async function Home() {
       <h1 className="mb-6 text-4xl font-semibold tracking-tight">Mis asignaturas</h1>
       {subjects.length === 0 ? (
         <p className="text-gris">
-          {user.isAdmin ? "Aún no has creado ninguna asignatura." : "Todavía no estás matriculado en ninguna asignatura."}
+          {user.isAdmin ? "Aún no has creado ninguna asignatura." : "Todavía no tienes ninguna asignatura."}
         </p>
       ) : (
         <ul className="grid gap-4 sm:grid-cols-2">
@@ -62,7 +62,7 @@ export default async function Home() {
           <form action={createSubject} className="flex flex-wrap items-end gap-3">
             <label className="flex flex-1 flex-col text-sm">
               Nombre
-              <input name="name" required className="input mt-1" placeholder="Tecnología 3º ESO" />
+              <input name="name" required className="input mt-1" placeholder="Diseño de Interfaces" />
             </label>
             <label className="flex flex-col text-sm">
               Curso

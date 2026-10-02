@@ -3,6 +3,7 @@
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Icono } from "@/components/icono";
+import { acceptAttr, extensionAllowed, showExtensions } from "@/lib/extensions";
 import { uploadWith } from "../sesiones/upload";
 import { removeSubmissionFileAction, startSubmissionUploadAction, submitAction } from "./actions";
 
@@ -14,7 +15,12 @@ export type EntregaProps = {
   status: "pendiente" | "entregada" | "tarde" | "sin-entregar";
   submittedAt: string | null; // ya formateada
   note: string;
+  url: string;
   files: Archivo[];
+  acceptsFiles: boolean;
+  acceptsLink: boolean;
+  allowedExtensions: string;
+  completion: boolean; // se valora entregada / no entregada
   graded: boolean;
   grade: number | null;
   feedback: string;
@@ -34,15 +40,19 @@ export function EntregaAlumno(p: EntregaProps) {
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const form = e.currentTarget;
-    const files = [...((form.elements.namedItem("files") as HTMLInputElement).files ?? [])];
+    const files = [...((form.elements.namedItem("files") as HTMLInputElement | null)?.files ?? [])];
     const note = (form.elements.namedItem("note") as HTMLTextAreaElement).value;
-    if (files.length === 0 && p.files.length === 0 && !note.trim()) return setError("Añade al menos un archivo o un comentario.");
+    const url = ((form.elements.namedItem("url") as HTMLInputElement | null)?.value ?? "").trim();
+    if (files.length === 0 && p.files.length === 0 && !note.trim() && !url) return setError("Añade al menos un archivo, un enlace o un comentario.");
+    const wrong = files.find((f) => !extensionAllowed(f.name, p.allowedExtensions));
+    if (wrong) return setError(`«${wrong.name}» no vale: solo se admiten archivos ${showExtensions(p.allowedExtensions)}.`);
+    if (url && !url.startsWith("https://")) return setError("El enlace debe empezar por https://");
     setBusy(true);
     setError(null);
     try {
       const fileIds = [];
       for (const f of files) fileIds.push(await uploadWith((meta) => startSubmissionUploadAction(p.assessmentId, meta), f));
-      const res = await submitAction(p.subjectId, p.assessmentId, { fileIds, note });
+      const res = await submitAction(p.subjectId, p.assessmentId, { fileIds, note, url });
       if (res.error) setError(res.error);
       else {
         formRef.current?.reset();
@@ -65,7 +75,13 @@ export function EntregaAlumno(p: EntregaProps) {
         {p.status === "pendiente" && <span className="badge text-papel">Sin entregar</span>}
       </div>
 
-      {p.grade !== null && (
+      {p.grade !== null && p.completion && (
+        <div className="mt-3 bg-tinta-profunda p-4">
+          <p className="text-lg font-semibold">{p.grade > 0 ? "Valorada como entregada" : "Valorada como no entregada"}</p>
+          {p.feedback && <p className="mt-2 whitespace-pre-line">{p.feedback}</p>}
+        </div>
+      )}
+      {p.grade !== null && !p.completion && (
         <div className="mt-3 flex flex-wrap items-baseline gap-4 bg-tinta-profunda p-4">
           <span className="font-mono text-4xl font-medium">{p.grade.toLocaleString("es-ES", { maximumFractionDigits: 2 })}</span>
           <span className="text-sm">sobre 10</span>
@@ -95,13 +111,32 @@ export function EntregaAlumno(p: EntregaProps) {
           ))}
         </ul>
       )}
+      {p.url && (
+        <a href={p.url} target="_blank" rel="noopener noreferrer" className="mt-3 inline-flex items-center gap-2 font-medium break-all underline underline-offset-4">
+          <Icono nombre="enlace" className="h-4 w-4 shrink-0" />{p.url}
+        </a>
+      )}
       {entregada && p.note && <p className="mt-2 text-sm whitespace-pre-line">«{p.note}»</p>}
 
       {p.graded ? (
-        p.grade === null && <p className="mt-3 text-sm">Ya está corregida. Verás la nota aquí cuando se publique.</p>
+        p.grade === null && <p className="mt-3 text-sm">Ya está evaluada. Verás el resultado aquí cuando se publique.</p>
       ) : (
         <form ref={formRef} onSubmit={onSubmit} className="mt-3 space-y-3">
-          <input name="files" type="file" multiple className="block w-full text-sm file:border-papel! file:text-papel! hover:file:bg-tinta!" />
+          {p.acceptsFiles && (
+            <div>
+              <input name="files" type="file" multiple accept={acceptAttr(p.allowedExtensions)} className="block w-full text-sm file:border-papel! file:text-papel! hover:file:bg-tinta!" />
+              {p.allowedExtensions && <p className="mt-1 text-sm">Formatos admitidos: {showExtensions(p.allowedExtensions)}</p>}
+            </div>
+          )}
+          {p.acceptsLink && (
+            <input
+              name="url"
+              type="url"
+              defaultValue={p.url}
+              placeholder="Enlace a tu trabajo (https://www.figma.com/…)"
+              className="w-full border border-papel/40 bg-tinta-profunda/40 px-3 py-2 text-papel placeholder:text-niebla"
+            />
+          )}
           <textarea
             name="note"
             rows={2}

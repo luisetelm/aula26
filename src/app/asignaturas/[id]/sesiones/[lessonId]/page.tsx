@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { showExtensions } from "@/lib/extensions";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { getSubjectAccess } from "@/lib/subject-access";
@@ -65,7 +66,7 @@ export default async function LessonEditor({ params }: PageProps<"/asignaturas/[
       </section>
 
       <section className="card space-y-4">
-        <h2 className="text-lg font-semibold">Pruebas</h2>
+        <h2 className="text-lg font-semibold">Tareas</h2>
         {lesson.assessments.length > 0 && (
           <ul className="divide-y divide-linea">
             {lesson.assessments.map((a) => (
@@ -75,7 +76,9 @@ export default async function LessonEditor({ params }: PageProps<"/asignaturas/[
                   <span className="text-gris">
                     {a.weight > 0 && ` · ${a.weight}%`}
                     {a.dueAt && ` · hasta ${formatDateTime(a.dueAt)}`}
-                    {a.acceptsSubmissions && " · con entrega"}
+                    {a.gradingMode === "COMPLETION" && " · entregada / no entregada"}
+                    {a.acceptsSubmissions && ` · archivos${a.allowedExtensions ? ` (${showExtensions(a.allowedExtensions)})` : ""}`}
+                    {a.acceptsLink && " · enlace"}
                   </span>
                   {a.publishAt && <span className="ml-2"><PublishBadge publishAt={a.publishAt} /></span>}
                 </span>

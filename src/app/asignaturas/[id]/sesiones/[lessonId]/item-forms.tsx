@@ -104,6 +104,9 @@ export function AssessmentFormView({ subjectId, lessonId }: { subjectId: string;
             weight: Number(val(form, "weight") || 0),
             rubric: val(form, "rubric"),
             acceptsSubmissions: (form.elements.namedItem("acceptsSubmissions") as HTMLInputElement).checked,
+            acceptsLink: (form.elements.namedItem("acceptsLink") as HTMLInputElement).checked,
+            allowedExtensions: val(form, "allowedExtensions"),
+            gradingMode: val(form, "gradingMode") === "COMPLETION" ? "COMPLETION" : "SCORE",
             fileId: file ? await uploadFile(subjectId, file) : null,
             publishAt: val(form, "publishAt"),
           });
@@ -111,7 +114,7 @@ export function AssessmentFormView({ subjectId, lessonId }: { subjectId: string;
       }}
       className="space-y-3"
     >
-      <input name="title" required placeholder="Título de la prueba" className="input w-full" />
+      <input name="title" required placeholder="Título de la tarea" className="input w-full" />
       <textarea name="instructions" rows={4} placeholder="Enunciado (admite Markdown)" className="input w-full font-mono text-sm" />
       <div className="flex flex-wrap items-end gap-3 text-sm">
         <label className="flex flex-col">
@@ -122,11 +125,29 @@ export function AssessmentFormView({ subjectId, lessonId }: { subjectId: string;
           Peso en la nota (%)
           <input name="weight" type="number" min={0} max={100} step="0.5" defaultValue={0} className="input mt-1 w-24" />
         </label>
-        <label className="flex items-center gap-2 pb-2">
-          <input name="acceptsSubmissions" type="checkbox" /> Los alumnos entregan archivos
+        <label className="flex flex-col">
+          Evaluación
+          <select name="gradingMode" className="input mt-1" defaultValue="SCORE">
+            <option value="SCORE">Nota de 0 a 10</option>
+            <option value="COMPLETION">Entregada / no entregada</option>
+          </select>
         </label>
       </div>
-      <textarea name="rubric" rows={3} placeholder="Rúbrica o criterios de corrección (solo la ven los profesores)" className="input w-full text-sm" />
+      <fieldset className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
+        <legend className="mb-1 font-medium">Entrega del alumnado</legend>
+        <label className="flex items-center gap-2">
+          <input name="acceptsSubmissions" type="checkbox" /> Archivos
+        </label>
+        <label className="flex items-center gap-2">
+          Solo
+          <input name="allowedExtensions" placeholder="pdf, fig" className="input w-32 py-1" />
+          <span className="text-gris">(vacío = cualquiera)</span>
+        </label>
+        <label className="flex items-center gap-2">
+          <input name="acceptsLink" type="checkbox" /> Enlace (Figma, web…)
+        </label>
+      </fieldset>
+      <textarea name="rubric" rows={3} placeholder="Rúbrica o criterios de evaluación (solo los ve el profesorado)" className="input w-full text-sm" />
       <div className="flex flex-wrap items-center gap-3 text-sm text-gris">
         <label>Archivo adjunto (opcional) <input name="file" type="file" className="ml-2" /></label>
       </div>
@@ -135,7 +156,7 @@ export function AssessmentFormView({ subjectId, lessonId }: { subjectId: string;
         <input name="publishAt" type="datetime-local" className="input py-1" />
       </label>
       {error && <p className="text-sm text-aviso">{error}</p>}
-      <button disabled={pending} className="btn-primary">{pending ? "Guardando…" : "Añadir prueba"}</button>
+      <button disabled={pending} className="btn-primary">{pending ? "Guardando…" : "Añadir tarea"}</button>
     </form>
   );
 }

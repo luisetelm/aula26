@@ -7,7 +7,7 @@ import type { User } from "@prisma/client";
 import { db } from "./db";
 import { canManageSubject } from "./auth";
 import { Forbidden, addAssessment, addMaterial, createLesson, fileForDownload, getTimeline, isPublished, updateLesson } from "./content";
-import { getSubmissionsOverview, proposeGrade } from "./submissions";
+import { COMPLETION_DONE, getSubmissionsOverview, proposeGrade } from "./submissions";
 import { readObject } from "./storage";
 import { parseLocal, toLocalInput } from "./time";
 
@@ -15,12 +15,14 @@ import { parseLocal, toLocalInput } from "./time";
 // Reutiliza content.ts y submissions.ts, que comprueban los permisos. Claude nunca publica,
 // borra ni pone notas definitivas: crea borradores y propone notas que el profesor revisa.
 
-const INSTRUCTIONS = `Aula26 es el aula virtual del profesor. Escribe siempre en español, con tuteo y lenguaje inclusivo ("alumnado", "profesorado").
+const INSTRUCTIONS = `Aula26 es el aula virtual del profesor. El alumnado es universitario (3º y 4º de grado): usa un registro académico y profesional, nunca infantil. Escribe en español, con tuteo y lenguaje inclusivo ("alumnado", "profesorado").
 - Las fechas van en hora de Madrid con el formato "2026-10-06T09:30".
 - Todo lo que crees queda como borrador: el profesor lo revisa y lo publica desde Aula26.
 - Solo puedes añadir materiales y tareas, o editar, en sesiones que estén en borrador.
 - El programa de una sesión es Markdown; cada paso en una línea que empiece por "- " y, si quieres, con la duración al final: "- Repaso de la sesión anterior (10 min)".
-- Para corregir: ver_entregas, leer_archivo de cada entrega y proponer_nota con una nota de 0 a 10 y un comentario breve, concreto y amable dirigido al alumno o alumna. El profesor revisa cada propuesta antes de que cuente.`;
+- Para evaluar: ver_entregas, leer_archivo de cada archivo y proponer_nota. El comentario va dirigido al estudiante: directo, concreto y argumentado con los criterios de la rúbrica, como en una revisión profesional. El profesor revisa cada propuesta antes de que cuente.
+- Hay dos tipos de tarea: "nota" (de 0 a 10) y "entregada / no entregada" (tareas de clase de la PAC). En estas últimas, propón entregada si la entrega cumple lo pedido y no entregada si falta o no cumple, explicando por qué.
+- Si una entrega es un enlace de Figma, revísalo con el conector de Figma (captura, estructura y contexto de diseño) si lo tienes disponible. Si no puedes abrirlo, dilo en vez de inventar la evaluación.`;
 
 const ok = (data: unknown): CallToolResult => ({ content: [{ type: "text", text: JSON.stringify(data, null, 1) }] });
 const fail = (message: string): CallToolResult => ({ content: [{ type: "text", text: message }], isError: true });
@@ -122,7 +124,10 @@ export function buildMcpServer(actor: User) {
             titulo: a.title,
             entrega_hasta: fecha(a.dueAt),
             peso: a.weight,
-            admite_entregas: a.acceptsSubmissions,
+            evaluacion: a.gradingMode === "COMPLETION" ? "entregada / no entregada" : "nota de 0 a 10",
+            admite_archivos: a.acceptsSubmissions,
+            extensiones: a.allowedExtensions || null,
+            admite_enlace: a.acceptsLink,
           })),
         })),
       );
@@ -204,12 +209,18 @@ export function buildMcpServer(actor: User) {
         instrucciones: z.string().default("").describe("Markdown"),
         entrega_hasta: z.string().optional().describe("Hora de Madrid, formato 2026-10-06T23:59"),
         peso: z.number().min(0).max(100).default(0).describe("Porcentaje de la nota final"),
-        rubrica: z.string().default("").describe("Criterios de corrección en Markdown"),
-        admite_entregas: z.boolean().default(true),
+        rubrica: z.string().default("").describe("Criterios de evaluación en Markdown"),
+        evaluacion: z.enum(["nota", "entregada"]).default("nota").describe("nota: de 0 a 10. entregada: entregada / no entregada (tareas de clase de la PAC)"),
+        admite_archivos: z.boolean().default(true),
+        extensiones: z.string().default("").describe("Extensiones admitidas, por ejemplo \"pdf, fig\". Vacío = cualquiera"),
+        admite_enlace: z.boolean().default(false).describe("Si el alumnado entrega un enlace (Figma, web…)"),
       },
       annotations: escritura,
     },
-    run(async (a: { sesion_id: string; titulo: string; instrucciones: string; entrega_hasta?: string; peso: number; rubrica: string; admite_entregas: boolean }) => {
+    run(async (a: {
+      sesion_id: string; titulo: string; instrucciones: string; entrega_hasta?: string; peso: number; rubrica: string;
+      evaluacion: "nota" | "entregada"; admite_archivos: boolean; extensiones: string; admite_enlace: boolean;
+    }) => {
       await draftLesson(actor, a.sesion_id);
       const t = await addAssessment(actor, a.sesion_id, {
         title: a.titulo,
@@ -217,7 +228,10 @@ export function buildMcpServer(actor: User) {
         dueAt: a.entrega_hasta ? parseFecha(a.entrega_hasta) : null,
         weight: a.peso,
         rubric: a.rubrica,
-        acceptsSubmissions: a.admite_entregas,
+        acceptsSubmissions: a.admite_archivos,
+        acceptsLink: a.admite_enlace,
+        allowedExtensions: a.extensiones,
+        gradingMode: a.evaluacion === "entregada" ? "COMPLETION" : "SCORE",
       });
       return ok({ tarea_id: t.id });
     }),
@@ -233,17 +247,27 @@ export function buildMcpServer(actor: User) {
     },
     run(async ({ tarea_id }: { tarea_id: string }) => {
       const { assessment: a, rows } = await getSubmissionsOverview(actor, tarea_id);
+      const completion = a.gradingMode === "COMPLETION";
+      const valor = (g: number | null) => (completion && g !== null ? (g > 0 ? "entregada" : "no entregada") : g);
       return ok({
-        tarea: { titulo: a.title, instrucciones: a.instructions, rubrica: a.rubric, entrega_hasta: fecha(a.dueAt), notas_publicadas: a.gradesPublished },
+        tarea: {
+          titulo: a.title,
+          instrucciones: a.instructions,
+          rubrica: a.rubric,
+          entrega_hasta: fecha(a.dueAt),
+          evaluacion: completion ? "entregada / no entregada" : "nota de 0 a 10",
+          notas_publicadas: a.gradesPublished,
+        },
         entregas: rows.map(({ student, submission: s, status }) => ({
           alumno_id: student.id,
           nombre: nombre(student),
           estado: status,
           entregada_el: fecha(s?.submittedAt),
           comentario_del_alumno: s?.note || null,
+          enlace: s?.url || null,
           archivos: (s?.files ?? []).map((f) => ({ archivo_id: f.id, nombre: f.name, tipo: f.mimeType, bytes: f.size })),
-          nota: s?.gradedAt ? { nota: s.grade, comentario: s.feedback } : null,
-          propuesta: s?.draftedAt ? { nota: s.draftGrade, comentario: s.draftFeedback } : null,
+          nota: s?.gradedAt ? { valor: valor(s.grade), comentario: s.feedback } : null,
+          propuesta: s?.draftedAt ? { valor: valor(s.draftGrade), comentario: s.draftFeedback } : null,
         })),
       });
     }),
@@ -286,17 +310,29 @@ export function buildMcpServer(actor: User) {
     "proponer_nota",
     {
       title: "Proponer nota",
-      description: "Propone una nota (0 a 10) y un comentario para la entrega de un alumno o alumna. No cuenta ni la ve el alumnado hasta que el profesor la acepta.",
+      description:
+        "Propone la evaluación de una entrega con un comentario: una nota de 0 a 10, o entregada / no entregada según el tipo de tarea. No cuenta ni la ve el alumnado hasta que el profesor la acepta.",
       inputSchema: {
         tarea_id: z.string(),
         alumno_id: z.string(),
-        nota: z.number().min(0).max(10),
-        comentario: z.string().describe("Para el alumno o alumna: qué está bien y qué mejorar"),
+        nota: z.number().min(0).max(10).optional().describe("Para tareas con nota de 0 a 10"),
+        entregada: z.boolean().optional().describe("Para tareas de entregada / no entregada"),
+        comentario: z.string().describe("Para el estudiante: qué funciona, qué no y qué mejorar, con criterio"),
       },
       annotations: { ...escritura, idempotentHint: true },
     },
-    run(async (a: { tarea_id: string; alumno_id: string; nota: number; comentario: string }) => {
-      await proposeGrade(actor, a.tarea_id, a.alumno_id, { grade: Math.round(a.nota * 100) / 100, feedback: a.comentario });
+    run(async (a: { tarea_id: string; alumno_id: string; nota?: number; entregada?: boolean; comentario: string }) => {
+      const t = await db.assessment.findUnique({ where: { id: a.tarea_id }, select: { gradingMode: true } });
+      if (!t) throw new Forbidden("La tarea no existe");
+      let grade: number;
+      if (t.gradingMode === "COMPLETION") {
+        if (a.entregada === undefined) return fail("Esta tarea se valora como entregada / no entregada: usa el campo entregada.");
+        grade = a.entregada ? COMPLETION_DONE : 0;
+      } else {
+        if (a.nota === undefined) return fail("Esta tarea se evalúa con nota de 0 a 10: usa el campo nota.");
+        grade = Math.round(a.nota * 100) / 100;
+      }
+      await proposeGrade(actor, a.tarea_id, a.alumno_id, { grade, feedback: a.comentario });
       return ok({ propuesta: "guardada", revisa: "El profesor la verá en la página de entregas de la tarea." });
     }),
   );

@@ -25,6 +25,7 @@ export default async function EntregasPage({ params }: PageProps<"/asignaturas/[
   if (a.lesson.subjectId !== id) notFound();
 
   const cuenta = (s: SubmissionStatus) => rows.filter((r) => r.status === s).length;
+  const completion = a.gradingMode === "COMPLETION";
   const corregidas = rows.filter((r) => r.submission?.gradedAt).length;
   const propuestas = rows.filter((r) => r.submission?.draftedAt).length;
   const notas = rows.map((r) => r.submission?.grade).filter((g): g is number => g !== null && g !== undefined);
@@ -40,14 +41,17 @@ export default async function EntregasPage({ params }: PageProps<"/asignaturas/[
         <p className="mt-1">
           {a.dueAt ? `Hasta el ${formatDateTime(a.dueAt)}` : "Sin fecha límite"}
           {a.weight > 0 && ` · ${a.weight}% de la nota`}
+          {completion && " · Se valora entregada / no entregada"}
         </p>
         <dl className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-5">
           {[
             ["Entregadas", cuenta("entregada")],
             ["Tarde", cuenta("tarde")],
             ["Sin entregar", cuenta("pendiente") + cuenta("sin-entregar")],
-            ["Corregidas", `${corregidas}/${rows.length}`],
-            ["Media", media === null ? "—" : media.toLocaleString("es-ES", { maximumFractionDigits: 1 })],
+            [completion ? "Valoradas" : "Corregidas", `${corregidas}/${rows.length}`],
+            completion
+              ? ["Aptas", rows.filter((r) => r.submission?.gradedAt && (r.submission.grade ?? 0) > 0).length]
+              : ["Media", media === null ? "—" : media.toLocaleString("es-ES", { maximumFractionDigits: 1 })],
           ].map(([k, v]) => (
             <div key={k}>
               <dt className="text-sm">{k}</dt>
@@ -62,8 +66,8 @@ export default async function EntregasPage({ params }: PageProps<"/asignaturas/[
           <h3 className="font-semibold">{a.gradesPublished ? "Las notas están publicadas" : "Las notas no se ven todavía"}</h3>
           <p className="text-sm text-gris">
             {a.gradesPublished
-              ? "Cada alumno ve su nota y tu comentario en la tarea."
-              : "Corrige con calma: el alumnado no verá nada hasta que publiques."}
+              ? "Cada estudiante ve su resultado y tu comentario en la tarea."
+              : "El alumnado no verá nada hasta que publiques."}
           </p>
           {propuestas > 0 && (
             <p className="mt-1 text-sm font-medium text-acento">
@@ -103,8 +107,13 @@ export default async function EntregasPage({ params }: PageProps<"/asignaturas/[
                     {s?.submittedAt && ` · ${formatDateTime(s.submittedAt)}`}
                   </span>
                 </div>
-                {s && (s.files.length > 0 || s.note) && (
+                {s && (s.files.length > 0 || s.note || s.url) && (
                   <div className="space-y-2 bg-papel p-3">
+                    {s.url && (
+                      <a href={s.url} target="_blank" rel="noopener noreferrer" className="enlace flex items-center gap-2 break-all">
+                        <Icono nombre="enlace" className="h-4 w-4 shrink-0" />{s.url}
+                      </a>
+                    )}
                     {s.files.map((f) => (
                       <a key={f.id} href={`/api/archivos/${f.id}`} className="enlace flex items-center gap-2">
                         <Icono nombre="lectura" className="h-4 w-4" />{f.name}
@@ -120,6 +129,8 @@ export default async function EntregasPage({ params }: PageProps<"/asignaturas/[
                   studentId={student.id}
                   grade={s?.grade ?? null}
                   feedback={s?.feedback ?? ""}
+                  completion={completion}
+                  submitted={!!s?.submittedAt}
                   proposal={s?.draftedAt ? { grade: s.draftGrade, feedback: s.draftFeedback } : null}
                 />
               </li>

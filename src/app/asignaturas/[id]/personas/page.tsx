@@ -36,7 +36,7 @@ export default async function PeoplePage({ params }: PageProps<"/asignaturas/[id
 
       <section className="card">
         <h2 className="mb-4 text-lg font-semibold">
-          Personas · {students} alumnos, {enrollments.length - students} profesores
+          Personas · {students} en el alumnado, {enrollments.length - students} en el profesorado
         </h2>
         {enrollments.length === 0 ? (
           <p className="text-gris">Todavía no hay nadie en esta asignatura.</p>

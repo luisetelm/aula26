@@ -35,9 +35,9 @@ export default async function ClaudePage() {
       <section className="card space-y-3">
         <h2 className="text-lg font-semibold">Qué le puedes pedir</h2>
         <ul className="list-disc space-y-1 pl-5">
-          <li>«Prepara las sesiones de la semana que viene de Tecnología con este temario.»</li>
-          <li>«Crea una tarea para el viernes con una rúbrica de 4 criterios.»</li>
-          <li>«Corrige las entregas de la práctica 2 con la rúbrica y propón nota y comentario.»</li>
+          <li>«Prepara las sesiones de la semana que viene de Diseño de Interfaces con este temario.»</li>
+          <li>«Crea una tarea de clase para la PAC, que se valore como entregada o no, y que solo admita .fig.»</li>
+          <li>«Evalúa los Figma entregados en la práctica 2 con la rúbrica y propón nota y comentario.»</li>
         </ul>
         <p className="text-sm text-gris">
           Las propuestas de nota aparecen en la página de entregas de cada tarea. No cuentan ni las ve el alumnado hasta que

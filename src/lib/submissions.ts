@@ -1,12 +1,13 @@
 import "server-only";
 import { randomBytes } from "node:crypto";
 import { z } from "zod";
-import type { User } from "@prisma/client";
+import type { GradingMode, User } from "@prisma/client";
 import { db } from "./db";
 import { canManageSubject } from "./auth";
 import { createUploadTarget } from "./storage";
 import { hashToken } from "./tokens";
 import { Forbidden, deleteFiles, isPublished, uploadInput } from "./content";
+import { extensionAllowed, showExtensions } from "./extensions";
 
 // Entregas del alumnado y notas. Igual que content.ts: cada función comprueba permisos.
 
@@ -25,7 +26,7 @@ async function assertCanSubmit(actor: User, assessmentId: string) {
     where: { userId_subjectId: { userId: actor.id, subjectId: a.lesson.subjectId } },
   });
   const visible = isPublished(a.lesson.publishAt) && isPublished(a.publishAt ?? a.lesson.publishAt);
-  if (enrollment?.role !== "STUDENT" || !visible || !a.acceptsSubmissions) throw new Forbidden("No puedes entregar aquí");
+  if (enrollment?.role !== "STUDENT" || !visible || !(a.acceptsSubmissions || a.acceptsLink)) throw new Forbidden("No puedes entregar aquí");
   return a;
 }
 
@@ -38,6 +39,10 @@ async function assertManageAssessment(actor: User, assessmentId: string) {
 export async function startSubmissionUpload(actor: User, assessmentId: string, input: z.input<typeof uploadInput>) {
   const a = await assertCanSubmit(actor, assessmentId);
   const meta = uploadInput.parse(input);
+  if (!a.acceptsSubmissions) throw new Forbidden("Esta tarea no admite archivos");
+  if (!extensionAllowed(meta.name, a.allowedExtensions)) {
+    throw new Forbidden(`«${meta.name}» no vale: solo se admiten archivos ${showExtensions(a.allowedExtensions)}`);
+  }
   const safeName = meta.name.normalize("NFD").replace(/[^\w.-]+/g, "_").slice(-100);
   const storageKey = `${a.lesson.subjectId}/entregas/${a.id}/${randomBytes(12).toString("hex")}/${safeName}`;
   const token = randomBytes(24).toString("base64url");
@@ -51,6 +56,7 @@ export async function startSubmissionUpload(actor: User, assessmentId: string, i
 export const submitInput = z.object({
   fileIds: z.array(z.string().min(1)).max(MAX_FILES_PER_SUBMISSION).default([]),
   note: z.string().max(5000).default(""),
+  url: z.union([z.literal(""), z.url({ protocol: /^https$/ })]).default(""),
 });
 
 // Entregar (o volver a entregar añadiendo archivos). La fecha de entrega es la del último envío.
@@ -63,7 +69,9 @@ export async function submit(actor: User, assessmentId: string, input: z.input<t
   });
   if (existing?.gradedAt) throw new Forbidden("La entrega ya está corregida");
   if ((existing?.files.length ?? 0) + data.fileIds.length > MAX_FILES_PER_SUBMISSION) throw new Forbidden("Demasiados archivos");
-  if (data.fileIds.length === 0 && !existing?.files.length && !data.note.trim()) throw new Forbidden("La entrega está vacía");
+  if (data.url && !a.acceptsLink) throw new Forbidden("Esta tarea no admite enlaces");
+  if (data.fileIds.length > 0 && !a.acceptsSubmissions) throw new Forbidden("Esta tarea no admite archivos");
+  if (data.fileIds.length === 0 && !existing?.files.length && !data.note.trim() && !data.url) throw new Forbidden("La entrega está vacía");
 
   const files = await db.storedFile.findMany({ where: { id: { in: data.fileIds } }, include: { material: true, assessment: true } });
   const ok = files.length === data.fileIds.length && files.every(
@@ -74,8 +82,8 @@ export async function submit(actor: User, assessmentId: string, input: z.input<t
   const now = new Date();
   const submission = await db.submission.upsert({
     where: { assessmentId_studentId: { assessmentId, studentId: actor.id } },
-    create: { assessmentId, studentId: actor.id, note: data.note, submittedAt: now },
-    update: { note: data.note, submittedAt: now },
+    create: { assessmentId, studentId: actor.id, note: data.note, url: data.url, submittedAt: now },
+    update: { note: data.note, url: data.url, submittedAt: now },
   });
   if (files.length) {
     await db.storedFile.updateMany({
@@ -99,14 +107,23 @@ export const gradeInput = z.object({
   feedback: z.string().max(10000).default(""),
 });
 
+// En las tareas de "entregada / no entregada" la nota es 1 (entregada) o 0 (no entregada).
+export const COMPLETION_DONE = 1;
+function assertGradeFits(mode: GradingMode, grade: number | null) {
+  if (mode === "COMPLETION" && grade !== null && grade !== 0 && grade !== COMPLETION_DONE) {
+    throw new Forbidden("En esta tarea solo se valora entregada (1) o no entregada (0)");
+  }
+}
+
 // Nota de 0 a 10 y comentario. Se puede poner nota aunque no haya entrega (por ejemplo, un 0).
 export async function gradeSubmission(actor: User, assessmentId: string, studentId: string, input: z.input<typeof gradeInput>) {
   const a = await assertManageAssessment(actor, assessmentId);
   const enrolled = await db.enrollment.findUnique({
     where: { userId_subjectId: { userId: studentId, subjectId: a.lesson.subjectId } },
   });
-  if (enrolled?.role !== "STUDENT") throw new Forbidden("No es alumno de la asignatura");
+  if (enrolled?.role !== "STUDENT") throw new Forbidden("No está en el alumnado de la asignatura");
   const data = gradeInput.parse(input);
+  assertGradeFits(a.gradingMode, data.grade);
   const gradedAt = data.grade === null && !data.feedback.trim() ? null : new Date();
   // Al guardar la nota, la propuesta de Claude ya está revisada y se descarta.
   const draft = { draftGrade: null, draftFeedback: "", draftedAt: null };
@@ -123,8 +140,9 @@ export async function proposeGrade(actor: User, assessmentId: string, studentId:
   const enrolled = await db.enrollment.findUnique({
     where: { userId_subjectId: { userId: studentId, subjectId: a.lesson.subjectId } },
   });
-  if (enrolled?.role !== "STUDENT") throw new Forbidden("No es alumno de la asignatura");
+  if (enrolled?.role !== "STUDENT") throw new Forbidden("No está en el alumnado de la asignatura");
   const data = gradeInput.parse(input);
+  assertGradeFits(a.gradingMode, data.grade);
   const draft = { draftGrade: data.grade, draftFeedback: data.feedback, draftedAt: new Date() };
   return db.submission.upsert({
     where: { assessmentId_studentId: { assessmentId, studentId } },
