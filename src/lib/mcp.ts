@@ -10,6 +10,7 @@ import { Forbidden, addAssessment, addMaterial, createLesson, fileForDownload, g
 import { appUrl } from "./oauth";
 import { COMPLETION_DONE, getSubmissionsOverview, proposeGrade } from "./submissions";
 import { readObject } from "./storage";
+import { readFig } from "./fig";
 import { parseLocal, toLocalInput } from "./time";
 
 // Servidor MCP de Aula26: lo que Claude puede hacer en nombre de un profesor.
@@ -28,6 +29,7 @@ const INSTRUCTIONS = `Aula26 es el aula virtual del profesor. El alumnado es uni
   · Si es pequeño (menos de 100 KB), puedes usar subir_archivo con el contenido en base64.
   · Si es un archivo que te ha adjuntado el profesor o es grande, y tienes un entorno para ejecutar código con internet, usa preparar_subida, ejecuta el comando curl que devuelve sobre el archivo y después anadir_material con tipo archivo.
   · Si el comando falla por falta de red, dile al profesor que añada el dominio del enlace a los dominios permitidos de la ejecución de código en su configuración de Claude, o que suba el archivo desde la sesión en Aula26.
+- Si una entrega es un archivo .fig, leer_archivo te da su estructura (páginas, frames, textos, componentes, auto layout, tipografías, colores) y una miniatura de la primera página, pero no imágenes de cada pantalla: tenlo en cuenta al valorar lo visual y dilo en el comentario si no puedes juzgarlo.
 - Si una entrega es un enlace de Figma, revísalo con el conector de Figma (captura, estructura y contexto de diseño) si lo tienes disponible. Si no puedes abrirlo, dilo en vez de inventar la evaluación.`;
 
 const ok = (data: unknown): CallToolResult => ({ content: [{ type: "text", text: JSON.stringify(data, null, 1) }] });
@@ -361,7 +363,7 @@ export function buildMcpServer(actor: User) {
     "leer_archivo",
     {
       title: "Leer archivo",
-      description: "El contenido de un archivo de una entrega o material: texto, Word (.docx), PDF o imagen.",
+      description: "El contenido de un archivo de una entrega o material: texto, Word (.docx), PDF, imagen o Figma (.fig: estructura de capas, textos, componentes, tipografías, colores y miniatura de la primera página).",
       inputSchema: { archivo_id: z.string() },
       annotations: lectura,
     },
@@ -380,6 +382,16 @@ export function buildMcpServer(actor: User) {
             { type: "resource", resource: { uri: `aula26://archivos/${f.id}`, mimeType: "application/pdf", blob: data.toString("base64") } },
           ],
         };
+      }
+      if (lower.endsWith(".fig")) {
+        const fig = await readFig(data).catch((e) => {
+          console.error("[mcp] .fig", e);
+          return null;
+        });
+        if (!fig) return fail(`No he podido leer «${f.name}»: quizá es de una versión de Figma que todavía no sé abrir. Pide un PDF exportado o el enlace.`);
+        const content: CallToolResult["content"] = [{ type: "text", text: `Archivo: ${f.name}\n${fig.summary}` }];
+        if (fig.thumbnail) content.push({ type: "image", data: fig.thumbnail.toString("base64"), mimeType: "image/png" });
+        return { content };
       }
       let text: string | null = null;
       if (lower.endsWith(".docx")) text = await docxText(data).catch(() => null);
