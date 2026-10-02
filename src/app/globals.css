@@ -59,7 +59,7 @@ body {
   }
 }
 
-.md { @apply space-y-2; }
+.md { @apply space-y-2; overflow-wrap: break-word; }
 .md h1, .md h2, .md h3 { @apply font-semibold; }
 .md ul { @apply list-disc pl-5; }
 .md ol { @apply list-decimal pl-5; }

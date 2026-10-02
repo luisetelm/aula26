@@ -237,7 +237,7 @@ function Sesion({
 
         {material.length > 0 && (
           <Plegable recordar={`m-${l.id}`} titulo="Material" tituloClassName="etiqueta">
-            <ul className="mt-3 grid gap-2 sm:grid-cols-2">
+            <ul className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
               {material.map((m) => <MaterialItem key={m.id} m={m} canManage={canManage} />)}
             </ul>
           </Plegable>
@@ -263,7 +263,7 @@ function MaterialItem({ m, canManage }: { m: Material; canManage: boolean }) {
     return (
       <li className="bg-papel p-3 sm:col-span-2">
         <Plegable recordar={`t-${m.id}`} titulo={<span className="flex flex-1 flex-wrap items-center justify-between gap-2">{cabecera}{canManage && m.publishAt && <PublishBadge publishAt={m.publishAt} />}</span>} tituloClassName="text-gris">
-          <div className="mt-2 pl-18"><Markdown>{m.body}</Markdown></div>
+          <div className="mt-2 sm:pl-18"><Markdown>{m.body}</Markdown></div>
         </Plegable>
       </li>
     );
