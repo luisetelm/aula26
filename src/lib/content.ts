@@ -173,6 +173,16 @@ export async function fileForDownload(user: User, fileId: string) {
   return f;
 }
 
+// ---------- Asignaturas ----------
+
+// Borra la asignatura con todo su contenido, entregas y archivos. Solo administración.
+export async function deleteSubject(actor: User, subjectId: string) {
+  if (!actor.isAdmin) throw new Forbidden("No autorizado");
+  const files = await db.storedFile.findMany({ where: { subjectId } });
+  await db.subject.delete({ where: { id: subjectId } });
+  await deleteFiles(files);
+}
+
 // ---------- Timeline ----------
 
 export async function getTimeline(subjectId: string, canManage: boolean) {

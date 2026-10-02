@@ -3,7 +3,7 @@ import { getSubjectAccess } from "@/lib/subject-access";
 
 export default async function SubjectLayout({ children, params }: LayoutProps<"/asignaturas/[id]">) {
   const { id } = await params;
-  const { subject, canManage } = await getSubjectAccess(id);
+  const { user, subject, canManage } = await getSubjectAccess(id);
   return (
     <main className="mx-auto w-full max-w-5xl px-4 py-8">
       <Link href="/" className="text-sm text-gris hover:text-acento">← Mis asignaturas</Link>
@@ -13,6 +13,7 @@ export default async function SubjectLayout({ children, params }: LayoutProps<"/
         <nav className="mt-4 flex gap-4 border-b border-linea text-sm">
           <Link href={`/asignaturas/${id}`} className="pb-2 text-acento">Timeline</Link>
           <Link href={`/asignaturas/${id}/personas`} className="pb-2 text-acento">Personas</Link>
+          {user.isAdmin && <Link href={`/asignaturas/${id}/ajustes`} className="pb-2 text-acento">Ajustes</Link>}
         </nav>
       )}
       <div className="mt-6">{children}</div>
