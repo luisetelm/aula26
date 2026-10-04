@@ -32,6 +32,7 @@ const INSTRUCTIONS = `Aula26 es el aula virtual del profesor. El alumnado es uni
 - Para editar un texto largo, léelo entero con ver_material y manda el texto completo: editar_material sustituye el texto entero.
 - El programa de una sesión es Markdown; cada paso en una línea que empiece por "- " y, si quieres, con la duración al final: "- Repaso de la sesión anterior (10 min)".
 - Para evaluar: ver_entregas, leer_archivo de cada archivo y proponer_nota. El comentario va dirigido al estudiante: directo, concreto y argumentado con los criterios de la rúbrica, como en una revisión profesional. El profesor revisa cada propuesta antes de que cuente. Pon notas definitivas (poner_nota, aceptar_propuestas) o publícalas (publicar_notas) solo si el profesor te lo pide expresamente.
+- Toda tarea que crees lleva rúbrica (es obligatoria): criterios observables y medibles, con su peso y qué distingue un trabajo excelente, suficiente e insuficiente. En las de entregada / no entregada, la lista de lo que la entrega debe cumplir. Si una tarea existente no tiene rúbrica, propónsela al profesor y añádela con editar_tarea. Evalúa siempre con la rúbrica de la tarea.
 - Hay dos tipos de tarea: "nota" (de 0 a 10) y "entregada / no entregada" (tareas de clase de la PAC). En estas últimas, propón entregada si la entrega cumple lo pedido y no entregada si falta o no cumple, explicando por qué.
 - Para subir un archivo (diapositivas, enunciado en PDF, plantilla…):
   · Si lo generas tú y es de texto (Markdown, HTML, CSV…), usa subir_archivo con el texto.
@@ -191,6 +192,7 @@ export function buildMcpServer(actor: User) {
             admite_archivos: a.acceptsSubmissions,
             extensiones: a.allowedExtensions || null,
             admite_enlace: a.acceptsLink,
+            rubrica: a.rubric.trim() ? "sí (en ver_entregas)" : "falta",
           })),
         })),
       );
@@ -421,7 +423,13 @@ export function buildMcpServer(actor: User) {
         instrucciones: z.string().default("").describe("Markdown"),
         entrega_hasta: z.string().optional().describe("Hora de Madrid, formato 2026-10-06T23:59"),
         peso: z.number().min(0).max(100).default(0).describe("Porcentaje de la nota final"),
-        rubrica: z.string().default("").describe("Criterios de evaluación en Markdown"),
+        rubrica: z
+          .string()
+          .trim()
+          .min(20, "Toda tarea necesita rúbrica")
+          .describe(
+            "Obligatoria, en Markdown. Para nota: criterios con su peso o puntos y qué distingue cada nivel. Para entregada: la lista de lo que debe cumplir para contar como entregada",
+          ),
         evaluacion: z.enum(["nota", "entregada"]).default("nota").describe("nota: de 0 a 10. entregada: entregada / no entregada (tareas de clase de la PAC)"),
         admite_archivos: z.boolean().default(true),
         extensiones: z.string().default("").describe("Extensiones admitidas, por ejemplo \"pdf, fig\". Vacío = cualquiera"),
