@@ -93,6 +93,30 @@ export async function deleteMaterial(actor: User, materialId: string) {
   return m.lesson.subjectId;
 }
 
+// Cambia el título, el texto, el enlace o si son diapositivas. El tipo y el archivo no cambian.
+export async function updateMaterial(
+  actor: User,
+  materialId: string,
+  changes: { title?: string; body?: string; url?: string; isSlides?: boolean; publishAt?: Date | null },
+) {
+  const m = await db.material.findUnique({ where: { id: materialId }, include: { lesson: true } });
+  if (!m) throw new Forbidden("El material no existe");
+  await assertManage(actor, m.lesson.subjectId);
+  const title = changes.title ?? m.title;
+  const merged =
+    m.kind === "TEXT"
+      ? { kind: "TEXT" as const, title, body: changes.body ?? m.body }
+      : m.kind === "LINK"
+        ? { kind: "LINK" as const, title, url: changes.url ?? m.url ?? "" }
+        : { kind: "FILE" as const, title, fileId: m.fileId ?? "" };
+  const publishAt = changes.publishAt === undefined ? m.publishAt : changes.publishAt;
+  const data = materialInput.parse({ ...merged, publishAt, isSlides: changes.isSlides ?? m.isSlides });
+  return db.material.update({
+    where: { id: m.id },
+    data: { title: data.title, isSlides: data.isSlides, publishAt: data.publishAt, ...(data.kind === "TEXT" && { body: data.body }), ...(data.kind === "LINK" && { url: data.url }) },
+  });
+}
+
 // ---------- Pruebas ----------
 
 export const assessmentInput = z.object({
@@ -115,6 +139,29 @@ export async function addAssessment(actor: User, lessonId: string, input: z.inpu
   const data = assessmentInput.parse(input);
   if (data.fileId) await claimFile(data.fileId, subjectId);
   return db.assessment.create({ data: { lessonId, ...data } });
+}
+
+// Cambia los datos de una tarea. No deja cambiar el tipo de evaluación si ya hay notas o propuestas.
+export async function updateAssessment(
+  actor: User,
+  assessmentId: string,
+  changes: Partial<Omit<z.input<typeof assessmentInput>, "fileId">>,
+) {
+  const a = await db.assessment.findUnique({ where: { id: assessmentId }, include: { lesson: true } });
+  if (!a) throw new Forbidden("La tarea no existe");
+  await assertManage(actor, a.lesson.subjectId);
+  const defined = Object.fromEntries(Object.entries(changes).filter(([, v]) => v !== undefined));
+  const data = assessmentInput.parse({
+    title: a.title, instructions: a.instructions, dueAt: a.dueAt, weight: a.weight, rubric: a.rubric,
+    acceptsSubmissions: a.acceptsSubmissions, acceptsLink: a.acceptsLink, allowedExtensions: a.allowedExtensions,
+    gradingMode: a.gradingMode, fileId: a.fileId, publishAt: a.publishAt,
+    ...defined,
+  });
+  if (data.gradingMode !== a.gradingMode) {
+    const graded = await db.submission.count({ where: { assessmentId, OR: [{ grade: { not: null } }, { draftGrade: { not: null } }] } });
+    if (graded) throw new Forbidden("No se puede cambiar el tipo de evaluación: la tarea ya tiene notas o propuestas");
+  }
+  return db.assessment.update({ where: { id: a.id }, data });
 }
 
 export async function deleteAssessment(actor: User, assessmentId: string) {
@@ -196,6 +243,23 @@ export async function fileForDownload(user: User, fileId: string) {
 }
 
 // ---------- Asignaturas ----------
+
+export const subjectInput = z.object({
+  name: z.string().trim().min(1).max(120),
+  academicYear: z.string().trim().min(1).max(20),
+  group: z.string().trim().max(40).default(""),
+});
+
+// Crear y editar asignaturas es cosa de administración.
+export async function createSubject(actor: User, input: z.input<typeof subjectInput>) {
+  if (!actor.isAdmin) throw new Forbidden("Solo administración puede crear asignaturas");
+  return db.subject.create({ data: subjectInput.parse(input) });
+}
+
+export async function updateSubject(actor: User, subjectId: string, input: z.input<typeof subjectInput>) {
+  if (!actor.isAdmin) throw new Forbidden("Solo administración puede editar asignaturas");
+  return db.subject.update({ where: { id: subjectId }, data: subjectInput.parse(input) });
+}
 
 // Borra la asignatura con todo su contenido, entregas y archivos. Solo administración.
 export async function deleteSubject(actor: User, subjectId: string) {
