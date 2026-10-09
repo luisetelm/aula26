@@ -92,10 +92,13 @@ async function gradeFor(tareaId: string, a: { nota?: number; entregada?: boolean
   return Math.round(a.nota * 100) / 100;
 }
 
+// Algunos clientes con la lista de herramientas antigua mandan los booleanos y null como texto.
+const boolArg = z.preprocess((v) => (v === "true" ? true : v === "false" ? false : v), z.boolean());
+
 // "ya", "2026-10-06T08:00" o null (con la sesión).
 function publishDate(value: string | null | undefined) {
   if (value === undefined) return undefined;
-  if (value === null || value === "") return null;
+  if (value === null || value === "" || value === "null") return null;
   return value === "ya" ? new Date() : parseFecha(value);
 }
 
@@ -338,7 +341,7 @@ export function buildMcpServer(actor: User) {
         url: z.string().optional().describe("Solo enlaces"),
         diapositivas: z.boolean().optional(),
         publicar_desde: z.string().nullable().optional().describe("Desde cuándo lo ve el alumnado: \"ya\", una fecha (hora de Madrid, 2026-10-06T08:00) o null para que aparezca con la sesión"),
-        oculto: z.boolean().optional().describe("true: el alumnado no lo ve hasta que se muestre (por ejemplo, los pasos de una práctica). false: se muestra"),
+        oculto: boolArg.optional().describe("true: el alumnado no lo ve hasta que se muestre (por ejemplo, los pasos de una práctica). false: se muestra"),
       },
       annotations: escritura,
     },
@@ -485,7 +488,7 @@ export function buildMcpServer(actor: User) {
         extensiones: z.string().optional(),
         admite_enlace: z.boolean().optional(),
         publicar_desde: z.string().nullable().optional().describe("Desde cuándo lo ve el alumnado: \"ya\", una fecha (hora de Madrid, 2026-10-06T08:00) o null para que aparezca con la sesión"),
-        oculto: z.boolean().optional().describe("true: el alumnado no lo ve hasta que se muestre (por ejemplo, los pasos de una práctica). false: se muestra"),
+        oculto: boolArg.optional().describe("true: el alumnado no lo ve hasta que se muestre (por ejemplo, los pasos de una práctica). false: se muestra"),
       },
       annotations: escritura,
     },
