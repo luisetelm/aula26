@@ -117,3 +117,42 @@ export async function setHiddenAction(subjectId: string, kind: "material" | "ass
   await content.setItemHidden(user, kind, id, hidden);
   refresh(subjectId);
 }
+
+export async function updateMaterialAction(subjectId: string, materialId: string, f: FormData): Promise<{ error?: string; ok?: boolean }> {
+  const user = await requireUser();
+  try {
+    await content.updateMaterial(user, materialId, {
+      title: str(f, "title"),
+      body: f.has("body") ? String(f.get("body")) : undefined,
+      url: f.has("url") ? str(f, "url") : undefined,
+      isSlides: f.has("slidesField") ? f.get("isSlides") === "on" : undefined,
+      publishAt: optDate(f, "publishAt"),
+    });
+  } catch (e) {
+    return { error: e instanceof content.Forbidden ? e.message : "Revisa los datos: el título es obligatorio y los enlaces deben empezar por http." };
+  }
+  refresh(subjectId);
+  return { ok: true };
+}
+
+export async function updateAssessmentAction(subjectId: string, assessmentId: string, f: FormData): Promise<{ error?: string; ok?: boolean }> {
+  const user = await requireUser();
+  try {
+    await content.updateAssessment(user, assessmentId, {
+      title: str(f, "title"),
+      instructions: String(f.get("instructions") ?? ""),
+      dueAt: optDate(f, "dueAt"),
+      weight: Number(str(f, "weight") || 0),
+      rubric: String(f.get("rubric") ?? ""),
+      acceptsSubmissions: f.get("acceptsSubmissions") === "on",
+      acceptsLink: f.get("acceptsLink") === "on",
+      allowedExtensions: str(f, "allowedExtensions"),
+      gradingMode: str(f, "gradingMode") === "COMPLETION" ? "COMPLETION" : "SCORE",
+      publishAt: optDate(f, "publishAt"),
+    });
+  } catch (e) {
+    return { error: e instanceof content.Forbidden ? e.message : "Revisa los datos: el título es obligatorio y el peso va de 0 a 100." };
+  }
+  refresh(subjectId);
+  return { ok: true };
+}
