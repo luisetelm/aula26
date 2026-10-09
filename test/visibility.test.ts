@@ -20,4 +20,9 @@ describe("visibilidad para el alumnado", () => {
   it("nada se ve si la sesión es un borrador", () => {
     expect(itemVisible({ publishAt: new Date("2026-10-03T08:00:00Z") }, { ...lesson, publishAt: null }, martes)).toBe(false);
   });
+
+  it("lo oculto no se ve aunque haya llegado su fecha", () => {
+    expect(itemVisible({ publishAt: null, hidden: true }, lesson, martes)).toBe(false);
+    expect(itemVisible({ publishAt: new Date("2026-10-03T08:00:00Z"), hidden: true }, lesson, martes)).toBe(false);
+  });
 });

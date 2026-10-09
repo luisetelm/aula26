@@ -4,6 +4,7 @@ import { getTimeline } from "@/lib/content";
 import { dayParts, daysUntil, formatDate, formatDateTime, relativeDay } from "@/lib/time";
 import { Markdown } from "@/components/markdown";
 import { Plegable } from "@/components/plegable";
+import { HiddenToggle } from "@/components/hidden-toggle";
 import { PublishBadge } from "@/components/publish-badge";
 import { Estrella, Icono } from "@/components/icono";
 import { Programa, minutosTotales } from "@/components/programa";
@@ -238,7 +239,7 @@ function Sesion({
         {material.length > 0 && (
           <Plegable recordar={`m-${l.id}`} titulo="Material" tituloClassName="etiqueta">
             <ul className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
-              {material.map((m) => <MaterialItem key={m.id} m={m} canManage={canManage} />)}
+              {material.map((m) => <MaterialItem key={m.id} m={m} canManage={canManage} subjectId={subjectId} />)}
             </ul>
           </Plegable>
         )}
@@ -250,7 +251,7 @@ function Sesion({
   );
 }
 
-function MaterialItem({ m, canManage }: { m: Material; canManage: boolean }) {
+function MaterialItem({ m, canManage, subjectId }: { m: Material; canManage: boolean; subjectId: string }) {
   const href = materialHref(m);
   const icono = m.kind === "LINK" ? "enlace" : "lectura";
   const cabecera = (
@@ -263,6 +264,7 @@ function MaterialItem({ m, canManage }: { m: Material; canManage: boolean }) {
     return (
       <li className="bg-papel p-3 sm:col-span-2">
         <Plegable recordar={`t-${m.id}`} titulo={<span className="flex flex-1 flex-wrap items-center justify-between gap-2">{cabecera}{canManage && m.publishAt && <PublishBadge publishAt={m.publishAt} />}</span>} tituloClassName="text-gris">
+          {canManage && <div className="mt-2"><HiddenToggle subjectId={subjectId} kind="material" id={m.id} hidden={m.hidden} /></div>}
           <div className="mt-2 sm:pl-18"><Markdown>{m.body}</Markdown></div>
         </Plegable>
       </li>
@@ -279,6 +281,7 @@ function MaterialItem({ m, canManage }: { m: Material; canManage: boolean }) {
           cabecera
         )}
         {canManage && m.publishAt && <PublishBadge publishAt={m.publishAt} />}
+        {canManage && <HiddenToggle subjectId={subjectId} kind="material" id={m.id} hidden={m.hidden} />}
       </div>
     </li>
   );
@@ -306,6 +309,7 @@ function Tarea({ a, canManage, now, entregas }: { a: Assessment; canManage: bool
           <Icono nombre="lectura" className="h-4 w-4" />{a.file.name}
         </a>
       )}
+      {canManage && <div className="mt-3"><HiddenToggle subjectId={entregas.subjectId} kind="assessment" id={a.id} hidden={a.hidden} oscuro /></div>}
       {conEntrega(a) && canManage && (
         <Link
           href={`/asignaturas/${entregas.subjectId}/tareas/${a.id}`}

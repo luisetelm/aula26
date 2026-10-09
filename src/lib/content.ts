@@ -29,13 +29,14 @@ export const isPublished = (publishAt: Date | null | undefined, now = new Date()
 
 // Hasta el día de la sesión el alumnado solo ve su título y fecha: el programa, el material y las
 // tareas aparecen ese día. Un material o tarea con fecha de publicación propia se ve desde esa
-// fecha (por ejemplo, una lectura previa).
+// fecha (por ejemplo, una lectura previa). Lo marcado como oculto no se ve hasta que el profesor
+// lo muestre (por ejemplo, los pasos de una práctica).
 export const sessionStarted = (lesson: { date: Date }, now = new Date()) => daysUntil(lesson.date, now) <= 0;
 export const itemVisible = (
-  item: { publishAt: Date | null },
+  item: { publishAt: Date | null; hidden?: boolean },
   lesson: { publishAt: Date | null; date: Date },
   now = new Date(),
-) => isPublished(lesson.publishAt, now) && (item.publishAt ? item.publishAt <= now : sessionStarted(lesson, now));
+) => !item.hidden && isPublished(lesson.publishAt, now) && (item.publishAt ? item.publishAt <= now : sessionStarted(lesson, now));
 
 // ---------- Sesiones ----------
 
@@ -115,6 +116,19 @@ export async function updateMaterial(
     where: { id: m.id },
     data: { title: data.title, isSlides: data.isSlides, publishAt: data.publishAt, ...(data.kind === "TEXT" && { body: data.body }), ...(data.kind === "LINK" && { url: data.url }) },
   });
+}
+
+// Oculta o muestra al alumnado un material o una tarea, sin tocar su fecha de publicación.
+export async function setItemHidden(actor: User, kind: "material" | "assessment", id: string, hidden: boolean) {
+  const item =
+    kind === "material"
+      ? await db.material.findUnique({ where: { id }, include: { lesson: true } })
+      : await db.assessment.findUnique({ where: { id }, include: { lesson: true } });
+  if (!item) throw new Forbidden(kind === "material" ? "El material no existe" : "La tarea no existe");
+  await assertManage(actor, item.lesson.subjectId);
+  if (kind === "material") await db.material.update({ where: { id }, data: { hidden } });
+  else await db.assessment.update({ where: { id }, data: { hidden } });
+  return item.lesson.subjectId;
 }
 
 // ---------- Pruebas ----------

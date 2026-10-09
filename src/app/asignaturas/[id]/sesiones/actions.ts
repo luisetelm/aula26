@@ -111,3 +111,9 @@ export async function deleteAssessmentAction(subjectId: string, assessmentId: st
   await content.deleteAssessment(user, assessmentId);
   refresh(subjectId);
 }
+
+export async function setHiddenAction(subjectId: string, kind: "material" | "assessment", id: string, hidden: boolean) {
+  const user = await requireUser();
+  await content.setItemHidden(user, kind, id, hidden);
+  refresh(subjectId);
+}

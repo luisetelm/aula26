@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { HiddenToggle } from "@/components/hidden-toggle";
 import { showExtensions } from "@/lib/extensions";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
@@ -55,9 +56,12 @@ export default async function LessonEditor({ params }: PageProps<"/asignaturas/[
                   {m.file && <span className="text-gris"> ({Math.ceil(m.file.size / 1024)} KB)</span>}
                   {m.publishAt && <span className="ml-2"><PublishBadge publishAt={m.publishAt} /></span>}
                 </span>
-                <form action={deleteMaterialAction.bind(null, id, m.id)}>
-                  <button className="text-aviso hover:underline">Quitar</button>
-                </form>
+                <span className="flex flex-none items-center gap-3">
+                  <HiddenToggle subjectId={id} kind="material" id={m.id} hidden={m.hidden} />
+                  <form action={deleteMaterialAction.bind(null, id, m.id)}>
+                    <button className="text-aviso hover:underline">Quitar</button>
+                  </form>
+                </span>
               </li>
             ))}
           </ul>
@@ -82,9 +86,12 @@ export default async function LessonEditor({ params }: PageProps<"/asignaturas/[
                   </span>
                   {a.publishAt && <span className="ml-2"><PublishBadge publishAt={a.publishAt} /></span>}
                 </span>
-                <form action={deleteAssessmentAction.bind(null, id, a.id)}>
-                  <button className="text-aviso hover:underline">Quitar</button>
-                </form>
+                <span className="flex flex-none items-center gap-3">
+                  <HiddenToggle subjectId={id} kind="assessment" id={a.id} hidden={a.hidden} />
+                  <form action={deleteAssessmentAction.bind(null, id, a.id)}>
+                    <button className="text-aviso hover:underline">Quitar</button>
+                  </form>
+                </span>
               </li>
             ))}
           </ul>

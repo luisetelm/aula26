@@ -8,7 +8,7 @@ import { db } from "./db";
 import { canManageSubject } from "./auth";
 import {
   Forbidden, addAssessment, addMaterial, createLesson, deleteAssessment, deleteLesson, deleteMaterial, fileForDownload, getTimeline,
-  createSubject, isPublished, startUpload, storeFile, updateAssessment, updateLesson, updateMaterial, updateSubject,
+  createSubject, isPublished, setItemHidden, startUpload, storeFile, updateAssessment, updateLesson, updateMaterial, updateSubject,
 } from "./content";
 import { appUrl } from "./oauth";
 import { COMPLETION_DONE, discardProposal, getSubmissionsOverview, gradeSubmission, proposeGrade, setGradesPublished } from "./submissions";
@@ -29,6 +29,7 @@ const INSTRUCTIONS = `Aula26 es el aula virtual del profesor. El alumnado es uni
 - Las sesiones que crees quedan en borrador. Publícalas con publicar_sesion solo cuando el profesor te lo pida.
 - Puedes añadir, editar y borrar materiales y tareas, y editar o borrar sesiones, también si ya están publicadas. En una sesión publicada los cambios los ve el alumnado (desde el día de la sesión), así que hazlos solo cuando el profesor te lo pida y dile qué has cambiado.
 - Borrar no se puede deshacer: antes de borrar, confirma con el profesor qué vas a borrar si no lo ha nombrado él. No se pueden borrar tareas ni sesiones con entregas del alumnado; eso lo hace el profesor desde Aula26.
+- Para dar algo más tarde (por ejemplo, el enunciado de una práctica ahora y los pasos cuando el profesor decida), pon lo que debe esperar como material aparte con oculto: true y muéstralo con editar_material oculto: false cuando el profesor lo pida. Para una fecha concreta, usa publicar_desde.
 - Para editar un texto largo, léelo entero con ver_material y manda el texto completo: editar_material sustituye el texto entero.
 - El programa de una sesión es Markdown; cada paso en una línea que empiece por "- " y, si quieres, con la duración al final: "- Repaso de la sesión anterior (10 min)".
 - Para evaluar: ver_entregas, leer_archivo de cada archivo y proponer_nota. El comentario va dirigido al estudiante: directo, concreto y argumentado con los criterios de la rúbrica, como en una revisión profesional. El profesor revisa cada propuesta antes de que cuente. Pon notas definitivas (poner_nota, aceptar_propuestas) o publícalas (publicar_notas) solo si el profesor te lo pide expresamente.
@@ -179,6 +180,8 @@ export function buildMcpServer(actor: User) {
             titulo: m.title,
             tipo: { TEXT: "texto", LINK: "enlace", FILE: "archivo" }[m.kind],
             diapositivas: m.isSlides,
+            ...(m.hidden && { oculto: true }),
+            ...(m.publishAt && { publicar_desde: fecha(m.publishAt) }),
             ...(m.kind === "LINK" && { url: m.url }),
             ...(m.kind === "TEXT" && { texto: m.body.length > 2000 ? `${m.body.slice(0, 2000)}… (recortado: léelo entero con ver_material)` : m.body }),
             ...(m.file && { archivo_id: m.file.id, archivo: m.file.name }),
@@ -193,6 +196,8 @@ export function buildMcpServer(actor: User) {
             extensiones: a.allowedExtensions || null,
             admite_enlace: a.acceptsLink,
             rubrica: a.rubric.trim() ? "sí (en ver_entregas)" : "falta",
+            ...(a.hidden && { oculta: true }),
+            ...(a.publishAt && { publicar_desde: fecha(a.publishAt) }),
           })),
         })),
       );
@@ -252,10 +257,11 @@ export function buildMcpServer(actor: User) {
         archivo_id: z.string().optional().describe("Para tipo archivo: el que devolvió preparar_subida, ya subido"),
         diapositivas: z.boolean().default(false).describe("Si son las diapositivas de la sesión"),
         publicar_desde: z.string().nullable().optional().describe("Desde cuándo lo ve el alumnado: \"ya\", una fecha (hora de Madrid, 2026-10-06T08:00) o null para que aparezca con la sesión"),
+        oculto: z.boolean().default(false).describe("true: el alumnado no lo ve hasta que se muestre"),
       },
       annotations: escritura,
     },
-    run(async (a: { sesion_id: string; tipo: "texto" | "enlace" | "archivo"; titulo: string; texto?: string; url?: string; archivo_id?: string; diapositivas: boolean; publicar_desde?: string | null }) => {
+    run(async (a: { oculto: boolean; sesion_id: string; tipo: "texto" | "enlace" | "archivo"; titulo: string; texto?: string; url?: string; archivo_id?: string; diapositivas: boolean; publicar_desde?: string | null }) => {
       await managedLesson(actor, a.sesion_id);
       if (a.tipo === "archivo") {
         const f = a.archivo_id ? await db.storedFile.findUnique({ where: { id: a.archivo_id } }) : null;
@@ -272,7 +278,8 @@ export function buildMcpServer(actor: User) {
           : a.tipo === "enlace"
             ? await addMaterial(actor, a.sesion_id, { kind: "LINK", title: a.titulo, url: a.url ?? "", isSlides: a.diapositivas, publishAt: publishDate(a.publicar_desde) ?? null })
             : await addMaterial(actor, a.sesion_id, { kind: "FILE", title: a.titulo, fileId: a.archivo_id ?? "", isSlides: a.diapositivas, publishAt: publishDate(a.publicar_desde) ?? null });
-      return ok({ material_id: m.id });
+      if (a.oculto) await setItemHidden(actor, "material", m.id, true);
+      return ok({ material_id: m.id, ...(a.oculto && { oculto: true }) });
     }),
   );
 
@@ -309,6 +316,8 @@ export function buildMcpServer(actor: User) {
         titulo: m.title,
         tipo: { TEXT: "texto", LINK: "enlace", FILE: "archivo" }[m.kind],
         diapositivas: m.isSlides,
+        oculto: m.hidden,
+        publicar_desde: fecha(m.publishAt),
         ...(m.kind === "TEXT" && { texto: m.body }),
         ...(m.kind === "LINK" && { url: m.url }),
         ...(m.file && { archivo_id: m.file.id, archivo: m.file.name }),
@@ -329,14 +338,16 @@ export function buildMcpServer(actor: User) {
         url: z.string().optional().describe("Solo enlaces"),
         diapositivas: z.boolean().optional(),
         publicar_desde: z.string().nullable().optional().describe("Desde cuándo lo ve el alumnado: \"ya\", una fecha (hora de Madrid, 2026-10-06T08:00) o null para que aparezca con la sesión"),
+        oculto: z.boolean().optional().describe("true: el alumnado no lo ve hasta que se muestre (por ejemplo, los pasos de una práctica). false: se muestra"),
       },
       annotations: escritura,
     },
-    run(async (a: { material_id: string; titulo?: string; texto?: string; url?: string; diapositivas?: boolean; publicar_desde?: string | null }) => {
+    run(async (a: { material_id: string; titulo?: string; texto?: string; url?: string; diapositivas?: boolean; publicar_desde?: string | null; oculto?: boolean }) => {
       const m = await managedMaterial(actor, a.material_id);
       if (a.texto !== undefined && m.kind !== "TEXT") return fail("Este material no es de texto.");
       if (a.url !== undefined && m.kind !== "LINK") return fail("Este material no es un enlace.");
       await updateMaterial(actor, m.id, { title: a.titulo, body: a.texto, url: a.url, isSlides: a.diapositivas, publishAt: publishDate(a.publicar_desde) });
+      if (a.oculto !== undefined) await setItemHidden(actor, "material", m.id, a.oculto);
       return ok({ material_id: m.id, sesion: estado(m.lesson.publishAt) });
     }),
   );
@@ -474,10 +485,12 @@ export function buildMcpServer(actor: User) {
         extensiones: z.string().optional(),
         admite_enlace: z.boolean().optional(),
         publicar_desde: z.string().nullable().optional().describe("Desde cuándo lo ve el alumnado: \"ya\", una fecha (hora de Madrid, 2026-10-06T08:00) o null para que aparezca con la sesión"),
+        oculto: z.boolean().optional().describe("true: el alumnado no lo ve hasta que se muestre (por ejemplo, los pasos de una práctica). false: se muestra"),
       },
       annotations: escritura,
     },
     run(async (a: {
+      oculto?: boolean;
       publicar_desde?: string | null;
       tarea_id: string; titulo?: string; instrucciones?: string; entrega_hasta?: string | null; peso?: number; rubrica?: string;
       evaluacion?: "nota" | "entregada"; admite_archivos?: boolean; extensiones?: string; admite_enlace?: boolean;
@@ -495,6 +508,7 @@ export function buildMcpServer(actor: User) {
         acceptsLink: a.admite_enlace,
         publishAt: publishDate(a.publicar_desde),
       });
+      if (a.oculto !== undefined) await setItemHidden(actor, "assessment", t.id, a.oculto);
       return ok({ tarea_id: t.id, sesion: estado(t.lesson.publishAt) });
     }),
   );
